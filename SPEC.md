@@ -996,14 +996,24 @@ Step:
 ### 7.2 Tech Stack
 
 ```
-Frontend: SvelteKit 2.x (BFF pattern)
+Frontend: SvelteKit 2.x (public user app)
 ├── shadcn-svelte (UI components)
 ├── TanStack Query (server state)
 ├── Axios (HTTP client)
-└── TailwindCSS (styling)
+├── TailwindCSS (styling)
+├── Theme: Oxford Blue (#002147) accent
+└── Auth: Ory Kratos + Oathkeeper
 
-BFF Layer: SvelteKit API routes
-├── Auth via Ory Kratos
+Admin: SvelteKit 2.x (separate project)
+├── shadcn-svelte (UI components)
+├── TanStack Query (server state)
+├── Axios (HTTP client)
+├── TailwindCSS (styling)
+├── Theme: Oxford Blue (#002147) accent
+└── Auth: Ory Kratos + Oathkeeper (admin role required)
+
+BFF Layer (embedded in each SvelteKit):
+├── Auth via Ory Kratos session
 ├── Proxy to core NATS/FastAPI
 └── Data transformation
 ```
