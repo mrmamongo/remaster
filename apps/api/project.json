@@ -1,0 +1,36 @@
+{
+  "name": "api",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/api/src",
+  "targets": {
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cd apps/api && pnpm dev",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cd apps/api && pnpm build",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "prisma:generate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cd apps/api && pnpm prisma generate",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "prisma:migrate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cd apps/api && pnpm prisma migrate dev",
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  }
+}

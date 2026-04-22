@@ -2,25 +2,28 @@
   "name": "llm-platform",
   "version": "0.1.0",
   "private": true,
-  "description": "LLM Platform - Corporate LLM Service",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
-    "dev:api": "npm run start:dev --workspace=@llm-platform/api",
-    "dev:worker": "npm run start:dev --workspace=@llm-platform/worker",
-    "dev:frontend": "npm run dev --workspace=@llm-platform/frontend",
-    "dev:admin": "npm run dev --workspace=@llm-platform/admin",
-    "build": "npm run build --workspaces --if-present",
-    "build:api": "npm run build --workspace=@llm-platform/api",
-    "build:worker": "npm run build --workspace=@llm-platform/worker",
-    "test": "npm run test --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present",
-    "prisma:generate": "npm run prisma:generate --workspace=@llm-platform/api",
-    "prisma:migrate": "npm run prisma:migrate --workspace=@llm-platform/api"
+    "dev": "nx run-many --targets=dev --parallel=1",
+    "dev:api": "nx run api:dev",
+    "dev:worker": "nx run worker:dev",
+    "dev:admin": "nx run admin:dev",
+    "dev:frontend": "nx run frontend:dev",
+    "build": "nx run-many --targets=build",
+    "build:api": "nx run api:build",
+    "build:worker": "nx run worker:build",
+    "test": "nx run-many --targets=test",
+    "lint": "nx run-many --targets=lint",
+    "prisma:generate": "nx run api:prisma:generate",
+    "prisma:migrate": "nx run api:prisma:migrate"
+  },
+  "nx": {
+    "includedScripts": []
   },
   "devDependencies": {
-    "typescript": "^5.0.0"
+    "nx": "^20.0.0",
+    "@nx/js": "^20.0.0",
+    "@nx/vite": "^20.0.0",
+    "@nx/cypress": "^20.0.0",
+    "@nx/playwright": "^20.0.0"
   }
 }

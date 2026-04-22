@@ -1,0 +1,64 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "targetDefaults": {
+    "build": {
+      "cache": true,
+      "dependsOn": ["^build"],
+      "outputs": ["{options.outputPath}"]
+    },
+    "dev": {
+      "cache": true,
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "cache": true,
+      "dependsOn": ["^build"]
+    }
+  },
+  "namedInputs": {
+    "default": ["{projectRoot}/**/*"],
+    "production": ["!{projectRoot}/**/?(*.spec|*.test).*"]
+  },
+  "plugins": [
+    {
+      "plugin": "@nx/js/plugin",
+      "options": {
+        "targets": ["tsc", "tsup", "esbuild"]
+      }
+    },
+    {
+      "plugin": "@nx/vite/plugin",
+      "options": {
+        "buildTargets": ["build"],
+        "devTargets": ["dev"],
+        "previewTargets": ["preview"],
+        "testTargets": ["test"],
+        "serveTargets": ["serve"],
+        "serveStaticTargets": ["serve-static"]
+      }
+    },
+    {
+      "plugin": "@nx/cypress/plugin",
+      "options": {
+        "ciTargetDefaults": ["e2e", "e2e-ci"]
+      }
+    },
+    {
+      "plugin": "@nx/playwright/plugin",
+      "options": {
+        "targetDefaults": ["playwright"]
+      }
+    }
+  ],
+  "generators": {
+    "@nx/svelte:application": {
+      "style": "css",
+      "strict": true,
+      "bundler": "vite"
+    },
+    "@nx/svelte:library": {
+      "style": "css",
+      "strict": true
+    }
+  }
+}
