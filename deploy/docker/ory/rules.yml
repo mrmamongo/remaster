@@ -1,0 +1,60 @@
+# Oathkeeper Access Rules
+# https://www.ory.sh/oathkeeper/docs/reference/api
+
+# API endpoints access rules
+rules:
+  # Health check - public
+  - id: health-public
+    upstream:
+      url: http://api:8080
+      preserve_host: true
+    match:
+      url: <http|https>://<.*>/health
+      methods:
+        - GET
+    authenticators:
+      - handler: anonymous
+    authorizer:
+      handler: allow
+    mutators:
+      - handler: noop
+
+  # API - requires JWT
+  - id: api-jwt
+    upstream:
+      url: http://api:8080
+      preserve_host: true
+    match:
+      url: <http|https>://<.*>/api/<.*>
+      methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+    authenticators:
+      - handler: jwt
+    authorizer:
+      handler: allow
+    mutators:
+      - handler: jwt
+
+  # Admin - requires JWT with admin role
+  - id: admin-jwt
+    upstream:
+      url: http://admin:3000
+      preserve_host: true
+    match:
+      url: <http|https>://<.*>/<.*>
+      methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+    authenticators:
+      - handler: jwt
+    authorizer:
+      handler: keto
+    mutators:
+      - handler: jwt

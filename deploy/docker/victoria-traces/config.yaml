@@ -1,0 +1,32 @@
+# Victoria Traces - Prometheus scrape config
+# This configures scraping of OTLP endpoints from our services
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'llm-platform-api'
+    static_configs:
+      - targets: ['api:8080']
+    metrics_path: '/metrics'
+    
+  - job_name: 'llm-platform-worker'
+    static_configs:
+      - targets: ['worker:8080']
+    metrics_path: '/metrics'
+    
+  - job_name: 'victoria-metrics-self'
+    static_configs:
+      - targets: ['victoriametrics:8428']
+    metrics_path: '/metrics'
+    
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    metrics_path: '/metrics'
+    
+  - job_name: 'nats'
+    static_configs:
+      - targets: ['nats:8222']
+    metrics_path: '/metrics'

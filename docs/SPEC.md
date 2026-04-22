@@ -15,7 +15,7 @@
 | **Cache + Session** | Redis |
 | **Observability** | Victoria Stack (Metrics + Logs + Traces) |
 | **File Storage** | S3 (Dev: MinIO, Prod: Cloud) |
-| **Workflows** | Temporal |
+| **Workflows** | Prefect |
 | **AI Models** | Mastra (formerly Composio) |
 | **Frontend** | SvelteKit + svelte-shadcn + TanStack Query |
 | **Auth** | Ory Kratos + Hydra + Oathkeeper + Keto |
@@ -573,14 +573,29 @@ group:{childId}@parent@group:{parentId}
 ## 8. Observability Stack
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Victoria Stack                            │
-├─────────────┬─────────────────┬──────────────────────────────┤
-│ Victoria   │ Victoria        │ Victoria                   │
-│ Metrics    │ Logs            │ Traces                     │
-│ (PromQL)   │ (LogQL)         │ (OTLP)                    │
-└─────────────┴─────────────────┴──────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                    Observability Stack                             │
+├─────────────┬─────────────────┬───────────────────┬──────────────────┤
+│   Vector    │ Victoria       │ Victoria          │ Victoria        │
+│   (Log      │ Metrics        │ Logs               │ Traces           │
+│   Collector)│ (PromQL)       │ (LogQL)            │ (OTLP)           │
+│ :9001       │ :8428          │ :9428              │ :9411            │
+└─────────────┴─────────────────┴───────────────────┴──────────────────┘
+
+ 收集       →   [Vector]   →   [Victoria]   →   [Admin UI/Grafana]
+  log/metrics      :9001         :8428/9428         :3000
 ```
+
+### 8.1 Log Collection (Vector)
+
+| Component | Purpose | Config |
+|-----------|---------|--------|
+| Vector | Collect logs from all services, forward to VictoriaLogs & VM | `vector.yaml` |
+
+**Sources:**
+- Docker logs (via socket)
+- HTTP (application logs)
+- Syslog (infrastructure)
 
 ### Victoria Metrics (Metrics)
 
@@ -604,12 +619,29 @@ group:{childId}@parent@group:{parentId}
 - Distributed tracing across NATS
 - Jaeger-compatible API
 
-### Admin Panel (Dashboards)
+### Admin Panel (BFF + API Gateway)
 
-Админ-панель построена на SvelteKit с дашбордами как в Grafana:
-- System Overview, LLM Metrics, Chat Analytics
-- Agent Execution, Knowledge Base, MCP Servers
-- Infrastructure, Logs, Traces, Audit Logs
+Админ-панель построена на SvelteKit как полноценный BFF:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                Admin Panel (SvelteKit BFF)                │
+│                         :3000                            │
+├─────────────────────────────────────────────────────────┤
+│  /api/users/*   → API Gateway :8080                      │
+│  /api/chats/*   → API Gateway :8080                      │
+│  /api/agents/* → API Gateway :8080                      │
+│  /metrics/*   → Victoria Metrics :8428                   │
+│  /logs/*     → Victoria Logs :9428                      │
+│  /traces/*   → Victoria Traces :9411                     │
+│  /admin/*   → Local (system config)                   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+Админка выступает единой точкой входа, роутит запросы до:
+- API :8080 — бизнес-логика
+- Victoria Stack — observability данные
+- Локальные admin-only routes
 
 ---
 

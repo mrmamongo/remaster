@@ -1,0 +1,34 @@
+{
+  "name": "@llm-platform/worker",
+  "version": "0.1.0",
+  "description": "LLM Platform Worker",
+  "private": true,
+  "scripts": {
+    "build": "nest build worker",
+    "start": "node dist/worker/main",
+    "start:dev": "nest start worker --watch",
+    "lint": "eslint \"{src,tests}/**/*.ts\"",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@nestjs/common": "^10.0.0",
+    "@nestjs/config": "^3.0.0",
+    "@nestjs/core": "^10.0.0",
+    "@nestjs/microservices": "^10.0.0",
+    "@prisma/client": "^5.0.0",
+    "class-transformer": "^0.5.0",
+    "class-validator": "^0.14.0",
+    "ioredis": "^5.0.0",
+    "nats": "^2.0.0",
+    "reflect-metadata": "^0.1.0",
+    "rxjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^10.0.0",
+    "@nestjs/testing": "^10.0.0",
+    "@types/node": "^20.0.0",
+    "prisma": "^5.0.0",
+    "ts-node": "^10.0.0",
+    "typescript": "^5.0.0"
+  }
+}

@@ -1,0 +1,295 @@
+// ============================================================================
+// LLM Platform - Prisma Schema
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// User & Auth
+// ============================================================================
+
+model User {
+  id              String    @id @default(uuid())
+  oryIdentityId   String?   @unique
+  email           String    @unique
+  displayName    String?
+  status          UserStatus @default(ACTIVE)
+  preferences    Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  chats           Chat[]
+  messages        Message[]
+  agents          Agent[]
+  knowledgeBases  KnowledgeBase[]
+  mcpServers      MCPServer[]
+  auditLogs       AuditLog[]
+
+  @@map("users")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+model UserGroup {
+  id          String       @id @default(uuid())
+  name        String
+  parentId    String?
+  metadata   Json?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  parent     UserGroup?  @relation("GroupToGroup", fields: [parentId], references: [id])
+  children   UserGroup[] @relation("GroupToGroup")
+  members    UserGroupMember[]
+
+  @@map("user_groups")
+}
+
+model UserGroupMember {
+  id         String    @id @default(uuid())
+  userId     String
+  groupId    String
+  role       String   @default("member")
+  createdAt  DateTime  @default(now())
+
+  user       User     @relation(fields: [userId], references: [id])
+  group      UserGroup @relation(fields: [groupId], references: [id])
+
+  @@unique([userId, groupId])
+  @@map("user_group_members")
+}
+
+// ============================================================================
+// Chat & Messages
+// ============================================================================
+
+model Chat {
+  id          String    @id @default(uuid())
+  userId      String
+  name        String
+  agentId     String?
+  metadata   Json?
+  createdAt   DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  owner       User     @relation(fields: [userId], references: [id])
+  messages    Message[]
+
+  @@map("chats")
+}
+
+model Message {
+  id           String       @id @default(uuid())
+  chatId       String
+  role         MessageRole
+  content      String
+  toolCalls    Json?
+  toolCallId   String?
+  model        String?
+  usage        Json?
+  metadata    Json?
+  createdAt    DateTime     @default(now())
+
+  chat         Chat         @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+enum MessageRole {
+  user
+  assistant
+  system
+  tool
+  reasoning
+  activity
+}
+
+// ============================================================================
+// Agents
+// ============================================================================
+
+model Agent {
+  id            String    @id @default(uuid())
+  name          String
+  description   String?
+  ownerType     OwnerType
+  ownerId       String
+  systemPrompt String?
+  modelId       String?
+  tools        Json?
+  maxTurns      Int       @default(10)
+  timeoutSeconds Int      @default(300)
+  isActive     Boolean   @default(true)
+  metadata     Json?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  owner         User      @relation(fields: [ownerId], references: [id])
+
+  @@map("agents")
+}
+
+enum OwnerType {
+  USER
+  PLATFORM
+  GROUP
+}
+
+// ============================================================================
+// Knowledge Base
+// ============================================================================
+
+model KnowledgeBase {
+  id              String         @id @default(uuid())
+  name            String
+  ownerId         String
+  searchMethods   SearchMethod[]
+  embeddingModelId String?
+  rerankerModelId  String?
+  topK            Int             @default(5)
+  chunkSize       Int            @default(1000)
+  chunkOverlap    Int            @default(200)
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  owner           User           @relation(fields: [ownerId], references: [id])
+
+  @@map("knowledge_bases")
+}
+
+enum SearchMethod {
+  VECTOR
+  BM25
+  HYBRID
+}
+
+// ============================================================================
+// MCP Servers
+// ============================================================================
+
+model MCPServer {
+  id          String       @id @default(uuid())
+  name        String
+  ownerId     String
+  url         String
+  authType   MCAuthType
+  authConfig Json?
+  status     ServerStatus @default(ACTIVE)
+  metadata   Json?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  owner       User        @relation(fields: [ownerId], references: [id])
+
+  @@map("mcp_servers")
+}
+
+enum MCAuthType {
+  NONE
+  OAUTH2
+  API_KEY
+}
+
+enum ServerStatus {
+  ACTIVE
+  INACTIVE
+  ERROR
+}
+
+// ============================================================================
+// Models (LLM)
+// ============================================================================
+
+model Model {
+  id           String      @id @default(uuid())
+  name         String      @unique
+  provider    ModelProvider
+  modality    ModelModality
+  endpoint    String?
+  apiKeyRef   String
+  config      Json?
+  pricing    Json?
+  isActive   Boolean     @default(true)
+  isDefault  Boolean     @default(false)
+  capabilities Json?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("models")
+}
+
+enum ModelProvider {
+  OPENAI
+  ANTHROPIC
+  GROQ
+  LOCAL
+}
+
+enum ModelModality {
+  CHAT
+  EMBEDDINGS
+  RERANK
+  VISION
+}
+
+// ============================================================================
+// Admin & Audit
+// ============================================================================
+
+model SystemConfig {
+  id          String    @id @default(uuid())
+  key         String    @unique
+  value      Json
+  category   String
+  isEditable Boolean  @default(true)
+  description String?
+  updatedAt  DateTime  @updatedAt
+  updatedBy String?
+
+  @@map("system_config")
+}
+
+model AuditLog {
+  id         String    @id @default(uuid())
+  userId     String
+  action     String
+  resource   String
+  resourceId String?
+  details   Json?
+  createdAt  DateTime  @default(now())
+
+  user       User      @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+// ============================================================================
+// Files (Attachments)
+// ============================================================================
+
+model File {
+  id          String    @id @default(uuid())
+  ownerId     String
+  ownerType   String
+  ownerId2   String
+  filename   String
+  fileType   String
+  fileSize   Int
+  s3Key      String
+  createdAt  DateTime  @default(now())
+
+  @@map("files")
+}

@@ -1,0 +1,131 @@
+# Kratos Configuration
+# https://www.ory.sh/kratos/docs/reference/configuration
+
+version: "1.2.0"
+
+dsn: memory
+
+log:
+  level: info
+  format: json
+
+serve:
+  public:
+    base_url: http://localhost:4433
+    cors:
+      enabled: true
+      allowed_origins:
+        - http://localhost:5173
+        - http://localhost:3000
+      allowed_methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+      allowed_headers:
+        - Authorization
+        - Content-Type
+        - X-Requested-With
+  admin:
+    base_url: http://kratos:4434/
+
+selfservice:
+  default_browser_return_url: http://localhost:5173
+
+  flows:
+    error:
+      # URL where the error flow will be redirected to
+      return_to: http://localhost:5173/error
+
+    settings:
+      # URL where the settings flow will be redirected to
+      return_to: http://localhost:5173/settings
+      lifespan: 1h
+
+    recovery:
+      # URL where the recovery flow will be redirected to
+      return_to: http://localhost:5173/recovery
+      lifespan: 1h
+
+    verification:
+      # URL where the verification flow will be redirected to
+      return_to: http://localhost:5173/verification
+      lifespan: 1h
+
+    logout:
+      # URL where the logout flow will be redirected to
+      return_to: http://localhost:5173/login
+      lifespan: 1h
+
+    login:
+      # URL where the login flow will be redirected to
+      return_to: http://localhost:5173/chat
+      lifespan: 10m
+
+    registration:
+      # URL where the registration flow will be redirected to
+      return_to: http://localhost:5173/chat
+      lifespan: 10m
+
+  methods:
+    password:
+      enabled: true
+      config:
+        validation:
+          min_length: 8
+
+    totp:
+      enabled: true
+
+    webauthn:
+      enabled: true
+
+  # Link account for social sign-in
+  # providers:
+  #   github:
+  #     enabled: true
+  #     client_id: ...
+  #     client_secret: ...
+  #   google:
+  #     enabled: true
+  #     client_id: ...
+  #     client_secret: ...
+
+courier:
+  enabled: true
+  smtp:
+    # Disable email courier in development
+    enabled: false
+
+# Secrets used by Ory Kratos to encrypt data
+secrets:
+  default:
+    - change-this-to-a-random-secret-at-least-32-bytes-long
+
+# Hashers used to hash credentials
+hashers:
+  algorithm: argon2
+  argon2:
+    parallelism: 1
+    memory: 131072
+    iterations: 2
+    salt_length: 16
+    key_length: 32
+
+# Identity schema
+identity:
+  default_schema_id: provider_default
+  schemas:
+    - id: provider_default
+      url: file:///etc/kratos/identity.schema.json
+
+# Session management
+session:
+  lifespan: 24h
+  cookies:
+    persistent:
+      enabled: true
+      lifetime: 24h
+    secure: false
+    same_site: Lax

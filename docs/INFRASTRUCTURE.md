@@ -147,6 +147,7 @@ services:
 
   victoriametrics:
     image: victoriametrics/victoria-metrics:latest
+    container_name: llm-victoria-metrics
     command:
       - --storage.maxDiskUsagePath=/var/lib/victoria-metrics-data
       - --http.responseHeaders.enabled=true
@@ -154,14 +155,47 @@ services:
     volumes:
       - victoria_data:/var/lib/victoria-metrics-data
     ports:
-      - "8428:8428"
-      - "8089:8089"
-      - "9090:9090"
+      - "8428:8428"  # VM UI + PromQL
+      - "8089:8089"  # Influx endpoints
+      - "9090:9090"  # Prometheus remote read/write
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8428/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+    networks:
+      - llm-network
+
+  victoria-logs:
+    image: victoriametrics/victoria-logs-datasource:latest
+    container_name: llm-victoria-logs
+    command:
+      - --storage.dataPath=/victoria-logs-data
+      - --httpListenAddr=:9428
+      - --logNewSeries=true
+    volumes:
+      - victoria_logs_data:/victoria-logs-data
+    ports:
+      - "9428:9428"  # Logs UI + LogQL
+    networks:
+      - llm-network
+
+  victoria-traces:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: llm-victoria-traces
+    command:
+      - --storage.maxDiskUsagePath=/victoria-traces-data
+      # OTLP receiver for traces
+      - --otlp.grpcListenAddr=:4317
+      - --otlp.httpListenAddr=:4318
+    volumes:
+      - victoria_traces_data:/victoria-traces-data
+    ports:
+      - "4317:4317"  # OTLP gRPC
+      - "4318:4318"  # OTLP HTTP
+      - "9411:9411"  # Jaeger UI
+    networks:
+      - llm-network
 
   # ============================================================================
   # APPLICATION
@@ -239,6 +273,8 @@ volumes:
   keto_data:
   hydra_data:
   victoria_data:
+  victoria_logs_data:
+  victoria_traces_data:
   qdrant_data:
 ```
 
@@ -258,6 +294,9 @@ volumes:
 | **MinIO** | 9000 | :9000 | S3 API |
 | **MinIO Console** | 9001 | :9001 | Admin UI |
 | **VictoriaMetrics** | 8428 | :8428 | Metrics + PromQL |
+| **VictoriaLogs** | 9428 | :9428 | Logs + LogQL |
+| **VictoriaTraces** | 9411 | :9411 | Traces + OTLP |
+| **Vector** | 9001 | :9001 | Log collector |
 | **Qdrant** | 6333 | :6333 | Vector DB |
 | **Krato** | 4433/4434 | :4433 | Auth API |
 | **Keto** | 4460/4461 | :4460 | Permissions |

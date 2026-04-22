@@ -1,0 +1,97 @@
+# ============================================================================
+# Vector Configuration for LLM Platform
+# ============================================================================
+# Vector collects logs from all services and forwards to VictoriaLogs
+# Also collects metrics and forwards to VictoriaMetrics
+# ============================================================================
+
+sources:
+  # Docker logs from all containers
+  docker_logs:
+    type: docker_logs
+  
+  # HTTP log source for application logs
+  app_logs:
+    type: http
+    address: 0.0.0.0:9000
+    encoding:
+      codec: json
+  
+  # Syslog for infrastructure services
+  syslog:
+    type: syslog
+    address: 0.0.0.0:514
+    mode: tcp
+    framing: octet_counting
+
+transforms:
+  # Enrich logs with metadata
+  enrich_logs:
+    type: remap
+    inputs:
+      - docker_logs
+      - app_logs
+    source: |
+      .service = del(.container_name) ?? "unknown"
+      .host = del(.hostname) ?? "localhost"
+      .timestamp = del(.timestamp) ?? now()
+      
+      # Parse JSON payload if present
+      if .message != "" && exists(.message) {
+        parsed, err = parse_json(.message)
+        if err == null {
+          . = merge(., parsed)
+        }
+      }
+  
+  # Filter for metrics
+  extract_metrics:
+    type: remap
+    inputs:
+      - app_logs
+    source: |
+      # Only process metric events
+      if .type == "metrics" {
+        . = {
+          __name__: .metric_name,
+          value: .metric_value,
+          labels: .labels
+        }
+      } else {
+        drop(. = true)
+      }
+
+sinks:
+  # Send logs to VictoriaLogs
+  victoria_logs:
+    type: http
+    inputs:
+      - enrich_logs
+    encoding:
+      codec: json
+    method: post
+    uri: http://victoria-logs:9428/insert/logs.json
+    batch:
+      max_events: 100
+      timeout_secs: 5
+  
+  # Send metrics to VictoriaMetrics
+  victoria_metrics:
+    type: http
+    inputs:
+      - extract_metrics
+    encoding:
+      codec: prometheus
+    method: post
+    uri: http://victoriametrics:8428/api/v1/import/prometheus
+    batch:
+      max_events: 50
+      timeout_secs: 5
+  
+  # Also output to stdout for debugging
+  stdout:
+    type: console
+    inputs:
+      - enrich_logs
+    encoding:
+      codec: json

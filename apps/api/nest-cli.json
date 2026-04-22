@@ -4,14 +4,7 @@
   "sourceRoot": "src",
   "compilerOptions": {
     "deleteOutDir": true,
-    "webpack": true,
-    "tsConfigPath": "apps/api/tsconfig.json"
-  },
-  "generatePackageJson": true,
-  "monorepo": true,
-  "root": "apps/api",
-  "language": "ts",
-  "entitiesDir": "database/entities",
-  "controllersDir": "chat/controller",
-  "providersDir": "chat/service"
+    "webpack": false,
+    "tsConfigPath": "tsconfig.json"
+  }
 }

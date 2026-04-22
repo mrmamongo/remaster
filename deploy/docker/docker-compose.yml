@@ -1,0 +1,275 @@
+# LLM Platform - Docker Compose
+
+version: '3.9'
+
+services:
+  # ============================================================================
+  # CORE SERVICES
+  # ============================================================================
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: llm-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-llm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-llm_dev_password_2024}
+      POSTGRES_DB: ${POSTGRES_DB:-llm_platform}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U llm"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - llm-network
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: llm-nats
+    command: ["-js", "--max_mem_store256MB", "--max_file_store1GB"]
+    environment:
+      NATS_PORT: 4222
+      NATS_MONITORING_PORT: 8222
+    volumes:
+      - nats_data:/data
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - llm-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: llm-redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - llm-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: llm-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-minioadmin123}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - llm-network
+
+  qdrant:
+    image: qdrant/qdrant:v1.12
+    container_name: llm-qdrant
+    volumes:
+      - qdrant_data:/qdrant/storage
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - llm-network
+
+  # ============================================================================
+  # VICTORIA STACK (Observability)
+  # ============================================================================
+
+  vector:
+    image: timberio/vector:0.40.0-debian
+    container_name: llm-vector
+    volumes:
+      - ./vector/vector.yaml:/etc/vector/vector.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      VECTOR_CONFIG: /etc/vector/vector.yaml
+    ports:
+      - "9001:9001"  # Vector API
+    depends_on:
+      - victoriametrics
+      - victoria-logs
+    networks:
+      - llm-network
+
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: llm-victoria-metrics
+    command:
+      - --storage.maxDiskUsagePath=/var/lib/victoria-metrics-data
+      - --http.responseHeaders.enabled=true
+      - --http.responseHeaders=X-Custom-Header:llm-platform
+      # Enable VM UI
+      - --vmui.enabled=true
+    volumes:
+      - victoria_metrics_data:/var/lib/victoria-metrics-data
+    ports:
+      - "8428:8428"  # VM UI + PromQL
+      - "8089:8089"  # Influx endpoints
+      - "9090:9090"  # Prometheus remote read/write
+    environment:
+      - VictoriaMetrics__port=8428
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8428/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - llm-network
+
+  victoria-logs:
+    image: victoriametrics/victoria-logs-datasource:latest
+    container_name: llm-victoria-logs
+    command:
+      - --storage.dataPath=/victoria-logs-data
+      - --httpListenAddr=:9428
+      - --logNewSeries=true
+    volumes:
+      - victoria_logs_data:/victoria-logs-data
+    ports:
+      - "9428:9428"  # Logs UI + LogQL
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9428/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - llm-network
+
+  victoria-traces:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: llm-victoria-traces
+    command:
+      - --storage.maxDiskUsagePath=/victoria-traces-data
+      - --promscrape.enabled=true
+      - --promscrape.config=/etc/victoria-traces/config.yaml
+      # OTLP receiver for traces
+      - --otlp.grpcListenAddr=:4317
+      - --otlp.httpListenAddr=:4318
+    volumes:
+      - victoria_traces_data:/victoria-traces-data
+      - ./victoria-traces/config.yaml:/etc/victoria-traces/config.yaml:ro
+    ports:
+      - "4317:4317"  # OTLP gRPC
+      - "4318:4318"  # OTLP HTTP
+      - "9411:9411"  # Jaeger UI
+    environment:
+      - VictoriaMetrics__storage.path=/victoria-traces-data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9411/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - llm-network
+
+  # ============================================================================
+  # ORY STACK
+  # ============================================================================
+
+  kratos:
+    image: oryd/kratos:v1.2.0
+    container_name: llm-kratos
+    volumes:
+      - ./ory/kratos.yml:/etc/kratos/kratos.yml:ro
+      - ./ory/identity.schema.json:/etc/kratos/identity.schema.json:ro
+      - kratos_db:/var/lib/kratos/data
+    ports:
+      - "4433:4433"
+      - "4434:4434"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DSN: postgres://llm:llm_dev_password_2024@postgres:5432/kratos?sslmode=disable
+    networks:
+      - llm-network
+
+  keto:
+    image: oryd/keto:v0.12.0
+    container_name: llm-keto
+    volumes:
+      - ./ory/keto.yml:/etc/keto/keto.yml:ro
+      - keto_data:/var/lib/keto/data
+    ports:
+      - "4460:4460"
+      - "4461:4461"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - llm-network
+
+  hydra:
+    image: oryd/hydra:v2.4.0
+    container_name: llm-hydra
+    volumes:
+      - ./ory/hydra.yml:/etc/hydra/hydra.yml:ro
+      - hydra_data:/var/lib/hydra
+    ports:
+      - "4444:4444"
+      - "4445:4445"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - llm-network
+
+  oathkeeper:
+    image: oryd/oathkeeper:v0.42.0
+    container_name: llm-oathkeeper
+    volumes:
+      - ./ory/oathkeeper.yml:/etc/oathkeeper/oathkeeper.yml:ro
+      - ./ory/rules.yml:/etc/oathkeeper/rules.yml:ro
+    ports:
+      - "4455:4455"
+      - "4456:4456"
+    depends_on:
+      - kratos
+    networks:
+      - llm-network
+
+volumes:
+  postgres_data:
+  nats_data:
+  redis_data:
+  minio_data:
+  kratos_db:
+  keto_data:
+  hydra_data:
+  victoria_metrics_data:
+  victoria_logs_data:
+  victoria_traces_data:
+  qdrant_data:
+  vector_data:
+
+networks:
+  llm-network:
+    driver: bridge

@@ -1,0 +1,64 @@
+# Hydra Configuration
+# https://www.ory.sh/hydra/docs/reference/configuration
+
+version: "2.4.0"
+
+log:
+  level: info
+  format: json
+
+serve:
+  public:
+    host: 0.0.0.0
+    port: 4444
+    cors:
+      enabled: true
+      allowed_origins:
+        - http://localhost:5173
+        - http://localhost:3000
+  admin:
+    host: 0.0.0.0
+    port: 4445
+
+url:
+  self:
+    public: http://localhost:4444
+    admin: http://hydra:4445
+
+secrets:
+  system:
+    - change-this-to-a-random-secret-at-least-32-bytes-long-in-prod
+
+oidc:
+  jwks:
+    # Auto-generate keys for development
+    auto_generate: true
+
+# Use in-memory database for development
+# In production, use PostgreSQL
+datasource:
+  postgres:
+    enabled: false
+
+urls:
+  consent: http://localhost:5173/consent
+  login: http://localhost:5173/login
+  logout: http://localhost:5173/logout
+
+# OAuth2 client configuration
+oauth2:
+  grant:
+    jwt:
+      # JWTs are generally valid for 1 hour
+      max_ttl: 1h
+  scope:
+    # Define your scopes here
+    enabled:
+      - openid
+      - offline
+      - offline_access
+  # Access token lifespan
+  ttl:
+    access_token: 1h
+    refresh_token: 24h
+    id_token: 1h

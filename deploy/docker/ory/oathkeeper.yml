@@ -1,0 +1,62 @@
+# Oathkeeper Configuration
+# https://www.ory.sh/oathkeeper/docs/reference/configuration
+
+version: "0.42.0"
+
+log:
+  level: info
+  format: json
+
+serve:
+  proxy:
+    host: 0.0.0.0
+    port: 4455
+    cors:
+      enabled: true
+      allowed_origins:
+        - http://localhost:5173
+        - http://localhost:3000
+  api:
+    host: 0.0.0.0
+    port: 4456
+
+# Access rules - managed via API or rules.yml
+errors:
+  fallback:
+    - json
+
+# Authorizer configuration
+authorizers:
+  # Allow anyone - use for development only
+  allow:
+    enabled: true
+  # JWT authorizer - validates JWT tokens
+  jwt:
+    enabled: true
+  # ORY Keto authorizer
+  keto:
+    enabled: true
+
+# Authentication methods
+authenticators:
+  # Anonymous - no authentication
+  anonymous:
+    enabled: true
+  # JWT authentication
+  jwt:
+    enabled: true
+  # API Key authentication
+  api_key:
+    enabled: true
+
+# Mutators - add identity to request
+mutators:
+  # No modification
+  noop:
+    enabled: true
+  # Add JWT to header
+  jwt:
+    enabled: true
+  # Add header with user ID
+  id_token:
+    enabled: true

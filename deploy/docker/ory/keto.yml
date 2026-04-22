@@ -1,0 +1,49 @@
+# Keto Configuration
+# https://www.ory.sh/keto/docs/reference/configuration
+
+version: "0.12.0"
+
+log:
+  level: info
+  format: json
+
+serve:
+  grpc:
+    host: 0.0.0.0:4461
+    tls:
+      enabled: false
+  http:
+    host: 0.0.0.0:4460
+    cors:
+      enabled: true
+      allowed_origins:
+        - http://localhost:5173
+        - http://localhost:3000
+        - http://localhost:8080
+
+namespaces:
+  - name: user
+    id: 1
+  - name: group
+    id: 2
+  - name: chat
+    id: 3
+  - name: agent
+    id: 4
+  - name: knowledge
+    id: 5
+  - name: mcp_server
+    id: 6
+  - name: model
+    id: 7
+
+datasource:
+  postgres:
+    enabled: true
+    conn_string: postgres://llm:llm_dev_password_2024@postgres:5432/keto?sslmode=disable
+
+write:
+  enabled: true
+
+read:
+  enabled: true
