@@ -3,7 +3,8 @@
 
 export * from './entities/chat.entity';
 export * from './repositories/chat-repo.interface';
-export * from './dto';
+export * from './dto/index';
+export * from './dto/responses';
 export * from './events/chat.events';
 export * from './interactors/chat.interactors';
 export * from './handlers';

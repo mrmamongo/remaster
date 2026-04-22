@@ -2,22 +2,60 @@
 
 ## Core Principles
 
-### 1. Handler → Interactor → Repository
+### 1. Layer Architecture
 
 ```
-Controller/HTTP
-    ↓
-Handler (CQRS Command/Query) — только диспатч, НЕ логика
-    ↓
-Interactor — вся бизнес-логика
-    ↓
-Repository — доступ к данным
+┌─────────────────────────────────────────────────────────────────┐
+│  Presentation Layer (Controllers)                                │
+│  • Request/Response mapping                                      │
+│  • HTTP streaming                                                │
+│  • Error formatting                                              │
+│  • THIS IS WHERE PRESENTATION LOGIC LIVES                        │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  Application Layer (CQRS)                                        │
+│  Handler (Command/Query) — dispatch ONLY, NO logic              │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  Domain Layer (Interactors)                                       │
+│  • Business logic                                                │
+│  • Entity operations                                             │
+│  • Domain events                                                 │
+│  • NO knowledge of HTTP, streaming, or presentation              │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  Infrastructure Layer (Repositories)                             │
+│  • Database access                                               │
+│  • External services                                             │
+│  • Caching                                                       │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-**Правило:** В хендлерах НЕТ бизнес-логики. Только:
-- Извлечение данных из команды/запроса
-- Вызов интерактора
-- Возврат результата
+### Rules
+
+**Controller = Presentation Logic ONLY:**
+- Extract DTO from request
+- Map to command/query input
+- Call handler
+- **Handle streaming** (SSE, chunked responses)
+- **Map response to API format**
+- **Format errors to HTTP responses**
+
+**Handler = CQRS Dispatch ONLY:**
+- Extract data from command/query
+- Call interactor
+- Return result
+- NO business logic, NO HTTP knowledge
+
+**Interactor = Business Logic ONLY:**
+- Validation
+- Entity creation/updates
+- Domain events
+- Call repository
+- NO HTTP knowledge, NO streaming
 
 ---
 
