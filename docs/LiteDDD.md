@@ -1,8 +1,12 @@
 # LiteDDD Architecture - LLM Platform
 
+## Overview
+
+LiteDDD (Lite Domain-Driven Design) — упрощённый DDD для монолита с TypeScript/NestJS.
+
 ## Core Principles
 
-### 1. Layer Architecture
+### Layer Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐

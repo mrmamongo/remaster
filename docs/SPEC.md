@@ -12,7 +12,7 @@
 | **Message Queue** | NATS (via @nestjs/microservices) |
 | **Database** | PostgreSQL 15+ (via Prisma) |
 | **Vector DB** | Qdrant |
-| **Cache + Rate Limiting** | Redis |
+| **Cache + Session** | Redis |
 | **Observability** | Victoria Stack (Metrics + Logs + Traces) |
 | **File Storage** | S3 (Dev: MinIO, Prod: Cloud) |
 | **Workflows** | Temporal |
