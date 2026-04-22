@@ -30,20 +30,20 @@
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         CORE PLATFORM (FastAPI)                             │
+│                         NESTJS API LAYER                                     │
 │                                                                              │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
 │  │                         NATS JetStream                                │   │
 │  │   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐             │   │
-│  │   │ Chats    │  │  Agents  │  │   KB     │  │   MCP    │             │   │
-│  │   │ Service  │  │ Service  │  │ Service  │  │ Service  │             │   │
+│  │   │  Chats   │  │  Agents   │  │   KB     │  │   MCP    │             │   │
+│  │   │ Service  │  │ Service   │  │ Service  │  │ Service  │             │   │
 │  │   └──────────┘  └──────────┘  └──────────┘  └──────────┘             │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                                                              │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
-│  │   LLM        │  │   Agent     │  │  Knowledge  │  │   Model     │        │
-│  │   Engine     │  │  Executor   │  │    Base     │  │  Gateway    │        │
-│  │  (PydanticAI)│  │  (ReAct)   │  │   Service   │  │  (SGL/vLLM) │        │
+│  │    LLM     │  │    Agent    │  │ Knowledge   │  │    Model    │        │
+│  │   Engine   │  │  Executor   │  │    Base     │  │   Gateway   │        │
+│  │  (Mastra)  │  │  (ReAct)    │  │  Service   │  │ (SGL/vLLM)  │        │
 │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘        │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
@@ -51,7 +51,7 @@
         │                           │                           │
         ▼                           ▼                           ▼
 ┌───────────────┐          ┌───────────────┐          ┌───────────────┐
-│   PostgreSQL   │          │    Redis      │          │   Vector DB   │
+│   PostgreSQL  │          │    Redis      │          │   Vector DB   │
 │   (Primary)   │          │   (Cache)     │          │   (Qdrant)    │
 └───────────────┘          └───────────────┘          └───────────────┘
                                     │
@@ -62,20 +62,21 @@
 │  │ Victoria │  │  Grafana  │  │   Loki   │  │ Promtail │  │ Alertmanager │  │
 │  │ Metrics  │  │          │  │  (Logs)  │  │          │  │              │  │
 │  └──────────┘  └──────────┘  └──────────┘  └──────────┘  └──────────────┘  │
-└─────────────────────────────────────────────────────────────────────────────┘
+└────────────────────────────────────────────────────────────────────���─��──────┘
 ```
 
-### 1.2 Technology Stack
+### 1.2 Technology Stack (TypeScript Monorepo)
 
 | Layer | Technology | Version | Purpose |
 |-------|------------|---------|---------|
-| API Framework | FastAPI | 0.115+ | REST API |
+| API Framework | NestJS | 11.x | REST API, DI, CQRS |
 | Message Queue | NATS | 2.10+ | Async communication |
-| Stream Processing | FastStream | 0.5+ | NATS integration |
+| Stream Processing | node-nats | 2.x | NATS integration |
 | Workflows | Temporal | 1.x+ | Task orchestration |
-| DI | Dishka | 1.x | Dependency injection |
-| LLM Framework | PydanticAI | 0.1+ | LLM agents |
+| DI | NestJS Built-in | - | Dependency injection |
+| LLM Framework | Mastra | 0.2.x | LLM agents, tools |
 | Database | PostgreSQL | 16+ | Primary store |
+| ORM | Prisma / Drizzle | latest | Database access |
 | Cache | Redis | 7.x | Sessions, cache |
 | Vector DB | Qdrant / pgvector | latest | Embeddings storage |
 | Auth | Ory Kratos | 1.x | Identity management |
@@ -88,7 +89,59 @@
 | Logs | Loki | latest | Log aggregation |
 | Alerts | Alertmanager | latest | Alerting |
 
-### 1.3 Performance Requirements
+### 1.3 Monorepo Structure
+
+```
+llm-platform/
+├── apps/
+│   ├── api              # NestJS API Gateway
+│   │   ├── src/
+│   │   │   ├── main.ts
+│   │   │   ├── app.module.ts
+│   │   │   ├── config/
+│   │   │   ├── common/        # Guards, Interceptors, Filters
+│   │   │   ├── database/      # Prisma/Drizzle
+│   │   │   ├── nats/          # NATS clients
+│   │   │   ├── auth/          # Ory integration
+│   │   │   ├── chat/         # Chat domain
+│   │   │   ├── agent/         # Agent domain
+│   │   │   ├── knowledge/     # Knowledge base domain
+│   │   │   ├── mcp/           # MCP domain
+│   │   │   ├── model/        # Model management
+│   │   │   ├── workflow/     # Temporal workflows
+│   │   │   └── admin/        # Admin endpoints
+│   │   └── test/
+│   ├── worker          # Background worker (Temporal)
+│   ├── frontend        # SvelteKit Public UI
+│   └── admin           # SvelteKit Admin Panel
+├── packages/
+│   ├── types           # Shared TypeScript types
+│   │   └── src/
+│   │       ├── entities/       # Entity interfaces
+│   │       ├── dto/           # DTOs
+│   │       └── events/       # NATS event types
+│   ├── config          # Shared configuration
+│   │   └── src/
+│   │       └── config.schema.ts
+│   ├── ui              # Shared UI components (Shadcn)
+│   │   └── src/
+│   │       └── components/
+│   ├── mastra-tools   # Custom Mastra tools
+│   │   └── src/
+│   │       ├── knowledge.ts
+│   │       ├── mcp.ts
+│   │       └── workflow.ts
+│   └── testing        # Test utilities
+│       └── src/
+│           ├── mocks/
+│           └── fixtures/
+├── scripts/            # Build, deploy, migration scripts
+├── docker/             # Dockerfiles, docker-compose
+├── k8s/               # Kubernetes manifests
+└── turbo.json         # Turborepo config
+```
+
+### 1.4 Performance Requirements
 
 ```
 Users: 1,000,000+
@@ -107,32 +160,34 @@ Availability: 99.9%
 
 ### 2.1 Entities
 
-```
+```typescript
+// packages/types/src/entities/
+
 User
 ├── id: UUID
-├── email: str
-├── ory_kratos_id: str (reference)
-├── created_at: datetime
-├── updated_at: datetime
-└── metadata: jsonb
+├── email: string
+├── oryKratosId: string (reference)
+├── createdAt: Date
+├── updatedAt: Date
+└── metadata: Record<string, any>
 
 Group (hierarchical, max depth 5)
 ├── id: UUID
-├── name: str
-├── parent_id: UUID? (nullable, self-referencing)
-├── path: str (materialized path: /company/dept/team)
-├── depth: int (1-5)
-├── created_at: datetime
-└── metadata: jsonb
+├── name: string
+├── parentId: UUID | null (self-referencing)
+├── path: string (materialized path: /company/dept/team)
+├── depth: number (1-5)
+├── createdAt: Date
+└── metadata: Record<string, any>
 
 Chat
 ├── id: UUID
-├── user_id: UUID (owner)
-├── name: str
-├── agent_id: UUID? (attached agent)
-├── created_at: datetime
-├── updated_at: datetime
-└── metadata: jsonb
+├── userId: UUID (owner)
+├── name: string
+├── agentId: UUID | null (attached agent)
+├── createdAt: Date
+├── updatedAt: Date
+└── metadata: Record<string, any>
 ```
 
 ### 2.2 Message Format (AG-UI Compatible)
@@ -165,7 +220,7 @@ interface UserMessage extends BaseMessage {
 
 type InputContent =
   | TextInputContent      // { type: "text", text: string }
-  | ImageInputContent  // { type: "image", source: { type: "url"|"data", value: string, mimeType: string } }
+  | ImageInputContent    // { type: "image", source: { type: "url"|"data", value: string, mimeType: string } }
   | AudioInputContent
   | VideoInputContent
   | DocumentInputContent;
@@ -174,8 +229,8 @@ type InputContent =
 interface AssistantMessage extends BaseMessage {
   role: "assistant";
   content?: string;              // Text response (optional if tool calls)
-  toolCalls?: ToolCall[];        // Active tool calls
-  toolCallsDone?: boolean;      // All tool calls completed
+  toolCalls?: ToolCall[];      // Active tool calls
+  toolCallsDone?: boolean;    // All tool calls completed
 }
 
 // Tool call definition
@@ -246,210 +301,228 @@ data: { "messageId": "reasoning_1", "delta": "Let me analyze..." }
 
 event: reasoning_message_end
 data: { "messageId": "reasoning_1" }
-
-// Message storage format (after streaming completes)
-- Stored in database as: full message object with role, content, metadata
-- Compatible with AG-UI serialization format
-- Full history can be restored from storage
 ```
 
-Agent (ReAct loop)
-├── id: UUID
-├── name: str
-├── description: str
-├── system_prompt: text
-├── model_id: UUID
-├── tools: list[Tool]
-├── max_iterations: int
-├── temperature: float
-├── created_at: datetime
-└── metadata: jsonb
+### 2.4 Core Entities
 
-Message (AG-UI compatible)
+```typescript
+// Agent (ReAct loop)
+Agent
 ├── id: UUID
-├── chat_id: UUID
+├── name: string
+├── description: string
+├── systemPrompt: string
+├── modelId: UUID
+├── tools: Tool[]
+├── maxIterations: number
+├── temperature: number
+├── createdAt: Date
+└── metadata: Record<string, any>
+
+// Message (AG-UI compatible)
+Message
+├── id: UUID
+├── chatId: UUID
 ├── role: MessageRole (user, assistant, system, tool, reasoning, activity)
-├── content: text | jsonb (supports multimodal)
-├── model: str
-├── tool_calls: jsonb? (array of tool calls if assistant used tools)
-├── tool_call_id: UUID? (for tool role messages)
-├── reasoning: text? (if reasoning role)
-├── activity_type: str? (if activity role)
-├── tokens_used: int
-├── latency_ms: int
-├── created_at: datetime
-└── metadata: jsonb
-├── id: UUID
-├── name: str
-├── description: str
-├── type: enum (function, mcp, http)
-├── definition: jsonb (OpenAI function format)
-└── is_enabled: bool
+├── content: string | Record<string, any>
+├── model: string
+├── toolCalls: ToolCall[] | null
+├── toolCallId: UUID | null
+├── reasoning: string | null
+├── activityType: string | null
+├── tokensUsed: number
+├── latencyMs: number
+├── createdAt: Date
+└── metadata: Record<string, any>
 
+// Tool
+Tool
+├── id: UUID
+├── name: string
+├── description: string
+├── type: ToolType (function, mcp, http)
+├── definition: Record<string, any> (OpenAI function format)
+└── isEnabled: boolean
+
+// KnowledgeBase
 KnowledgeBase
 ├── id: UUID
-├── name: str
-├── description: str
-├── owner_id: UUID
-├── embedding_model_id: UUID
-├── search_type: enum (semantic, hybrid, bm25)
-├── chunk_size: int
-├── chunk_overlap: int
-├── created_at: datetime
-└── metadata: jsonb
+├── name: string
+├── description: string
+├── ownerId: UUID
+├── embeddingModelId: UUID
+├── searchType: SearchType (semantic, hybrid, bm25)
+├── chunkSize: number
+├── chunkOverlap: number
+├── createdAt: Date
+└── metadata: Record<string, any>
 
+// KnowledgeBaseDocument
 KnowledgeBaseDocument
 ├── id: UUID
-├── knowledge_base_id: UUID
-├── filename: str
-├── file_path: str
-├── file_size: int
-├── mime_type: str
-├── status: enum (pending, processing, ready, error)
-├── chunks_count: int
-├── embedded_at: datetime?
-└── metadata: jsonb
+├── knowledgeBaseId: UUID
+├── filename: string
+├── filePath: string
+├── fileSize: number
+├── mimeType: string
+├── status: DocumentStatus (pending, processing, ready, error)
+├── chunksCount: number
+├── embeddedAt: Date | null
+└── metadata: Record<string, any>
 
+// MCPServer
 MCPServer
 ├── id: UUID
-├── name: str
-├── description: str
-├── endpoint: str (URL)
-├── auth_type: enum (none, api_key, oauth)
-├── auth_config: jsonb (encrypted)
-├── is_enabled: bool
-├── created_by: UUID
-├── created_at: datetime
-└── metadata: jsonb
+├── name: string
+├── description: string
+├── endpoint: string (URL)
+├── authType: AuthType (none, api_key, oauth)
+├── authConfig: Record<string, any> (encrypted)
+├── isEnabled: boolean
+├── createdBy: UUID
+├── createdAt: Date
+└── metadata: Record<string, any>
 
+// Model
 Model
 ├── id: UUID
-├── name: str
-├── provider: enum (openai, anthropic, groq, local)
-├── model_type: enum (chat, embedding, rerank, vision)
-├── endpoint_url: str?
-├── api_key_ref: str (secret reference)
-├── is_enabled: bool
-├── max_tokens: int
-├── supports_streaming: bool
-├── supports_function_calling: bool
-├── pricing: jsonb (input/output per 1M tokens)
-└── metadata: jsonb
+├── name: string
+├── provider: ModelProvider (openai, anthropic, groq, local)
+├── modelType: ModelType (chat, embedding, rerank, vision)
+├── endpointUrl: string | null
+├── apiKeyRef: string (secret reference)
+├── isEnabled: boolean
+├── maxTokens: number
+├── supportsStreaming: boolean
+├── supportsFunctionCalling: boolean
+├── pricing: Record<string, any> (input/output per 1M tokens)
+└── metadata: Record<string, any>
 
+// Role
 Role
 ├── id: UUID
-├── name: str
-├── description: str
-└── permissions: list[str]
+├── name: string
+├── description: string
+└── permissions: string[]
 
+// UserRole
 UserRole
-├── user_id: UUID
-├── role_id: UUID
-└── scope: enum (global, group, resource)
+├── userId: UUID
+├── roleId: UUID
+└── scope: Scope (global, group, resource)
 
+// AuditLog
 AuditLog
 ├── id: UUID
-├── user_id: UUID
-├── action: str
-├── resource_type: str
-├── resource_id: UUID
-├── old_value: jsonb?
-├── new_value: jsonb?
-├── ip_address: str
-├── user_agent: str
-└── created_at: datetime
+├── userId: UUID
+├── action: string
+├── resourceType: string
+├── resourceId: UUID
+├── oldValue: Record<string, any> | null
+├── newValue: Record<string, any> | null
+├── ipAddress: string
+├── userAgent: string
+└── createdAt: Date
 
+// ServiceAccount
 ServiceAccount
 ├── id: UUID
-├── name: str
-├── user_id: UUID (owner)
-├── group_id: UUID? (if belongs to group)
-├── secret_hash: str (bcrypt)
-├── scopes: list[str]
-├── rate_limit_rpm: int
-├── rate_limit_tpm_daily: int
-├── is_active: bool
-├── last_used_at: datetime?
-├── expires_at: datetime?
-├── created_at: datetime
-└── metadata: jsonb
+├── name: string
+├── userId: UUID (owner)
+├── groupId: UUID | null (if belongs to group)
+├── secretHash: string (bcrypt)
+├── scopes: string[]
+├── rateLimitRpm: number
+├── rateLimitTpmDaily: number
+��── isActive: boolean
+├── lastUsedAt: Date | null
+├── expiresAt: Date | null
+├── createdAt: Date
+└── metadata: Record<string, any>
 
+// ServiceAccountAuditLog
 ServiceAccountAuditLog
 ├── id: UUID
-├── service_account_id: UUID
-├── action: str
-├── resource_type: str
-├── resource_id: UUID?
-├── ip_address: str
-├── user_agent: str
-└── created_at: datetime
+├── serviceAccountId: UUID
+├── action: string
+├── resourceType: string
+├── resourceId: UUID | null
+├── ipAddress: string
+├── userAgent: string
+└── createdAt: Date
 
+// MCPTool
 MCPTool
 ├── id: UUID
-├── mcp_server_id: UUID
-├── name: str
-├── description: str
-├── input_schema: jsonb
-└── metadata: jsonb
+├── mcpServerId: UUID
+├── name: string
+├── description: string
+├── inputSchema: Record<string, any>
+└── metadata: Record<string, any>
 
+// MCPToolUsageLog
 MCPToolUsageLog
 ├── id: UUID
-├── mcp_tool_id: UUID
-├── user_id: UUID
-├── service_account_id: UUID?
-├── status: enum (success, error)
-├── latency_ms: int
-├── error_message: str?
-└── created_at: datetime
+├── mcpToolId: UUID
+├── userId: UUID
+├── serviceAccountId: UUID | null
+├── status: UsageStatus (success, error)
+├── latencyMs: number
+├── errorMessage: string | null
+└── createdAt: Date
 
-AgentWorkflow (Temporal)
+// AgentWorkflow (Temporal)
+AgentWorkflow
 ├── id: UUID
-├── name: str
-├── description: str
-├── workflow_type: enum (simple, chain, parallel, conditional)
-├── definition: jsonb (Temporal workflow definition)
-├── input_schema: jsonb
-├── output_schema: jsonb
-├── is_active: bool
-├── created_at: datetime
-└── metadata: jsonb
+├── name: string
+├── description: string
+├── workflowType: WorkflowType (simple, chain, parallel, conditional)
+├── definition: Record<string, any> (Temporal workflow definition)
+├── inputSchema: Record<string, any>
+├── outputSchema: Record<string, any>
+├── isActive: boolean
+├── createdAt: Date
+└── metadata: Record<string, any>
 
+// AgentWorkflowExecution
 AgentWorkflowExecution
 ├── id: UUID
-├── workflow_id: UUID
-├── user_id: UUID
-├── status: enum (pending, running, completed, failed, cancelled)
-├── input: jsonb
-├── output: jsonb?
-├── error: str?
-├── started_at: datetime
-├── completed_at: datetime?
-└── metadata: jsonb
+├── workflowId: UUID
+├── userId: UUID
+├── status: ExecutionStatus (pending, running, completed, failed, cancelled)
+├── input: Record<string, any>
+├── output: Record<string, any> | null
+├── error: string | null
+├── startedAt: Date
+├── completedAt: Date | null
+└── metadata: Record<string, any>
 
+// AgentWorkflowExecutionLog
 AgentWorkflowExecutionLog
 ├── id: UUID
-├── execution_id: UUID
-├── step: int
-├── step_name: str
-├── status: enum (pending, running, completed, failed)
-├── input: jsonb
-├── output: jsonb?
-├── error: str?
-├── started_at: datetime
-└── completed_at: datetime?
+├── executionId: UUID
+├── step: number
+├── stepName: string
+├── stepStatus: StepStatus (pending, running, completed, failed)
+├── input: Record<string, any>
+├── output: Record<string, any> | null
+├── error: string | null
+├── startedAt: Date
+└── completedAt: Date | null
 
+// AgentWorkflowMetrics
 AgentWorkflowMetrics
 ├── id: UUID
-├── workflow_id: UUID
-├── date: date
-├── total_executions: int
-├── successful_executions: int
-├── failed_executions: int
-├── avg_duration_ms: int
-└── p95_duration_ms: int
+├── workflowId: UUID
+├── date: Date
+├── totalExecutions: number
+├── successfulExecutions: number
+├── failedExecutions: number
+├── avgDurationMs: number
+└── p95DurationMs: number
 ```
 
-### 2.2 Relationships (ReBAC)
+### 2.5 Relationships (ReBAC)
 
 ```
 # Ownership
@@ -498,735 +571,479 @@ message.>
 
 # Agents
 agent.>
-# agent.create, agent.update, agent.delete, agent.execute, agent.list
+# agent.create, agent.update, agent.delete, agent.execute, agent.execution.>
 
 # Knowledge Base
 kb.>
-# kb.create, kb.update, kb.delete, kb.search, kb.ingest
+# kb.create, kb.update, kb.delete, kb.search, kb.document.>
 
 # MCP
 mcp.>
-# mcp.connect, mcp.disconnect, mcp.execute
+# mcp.create, mcp.connect, mcp.tools, mcp.execute
 
 # Models
 model.>
-# model.register, model.update, model.health
+# model.list, model.validate, model.health
 
-# System
-system.>
-# system.health, system.metrics
-```
-
-### 3.2 REST API Endpoints (BFF)
-
-```
-# Auth (via Ory)
-POST   /auth/login
-POST   /auth/logout
-GET    /auth/me
-POST   /auth/register
-
-# Users
-GET    /api/users
-GET    /api/users/{id}
-PATCH  /api/users/{id}
-DELETE /api/users/{id}
-
-# Groups
-GET    /api/groups
-GET    /api/groups/{id}
-POST   /api/groups
-PATCH  /api/groups/{id}
-DELETE /api/groups/{id}
-GET    /api/groups/{id}/members
-POST   /api/groups/{id}/members
-DELETE /api/groups/{id}/members/{user_id}
-
-# Chats
-GET    /api/chats
-GET    /api/chats/{id}
-POST   /api/chats
-PATCH  /api/chats/{id}
-DELETE /api/chats/{id}
-
-# Messages
-GET    /api/chats/{chat_id}/messages
-POST   /api/chats/{chat_id}/messages
-GET    /api/chats/{chat_id}/messages/{id}
-DELETE /api/chats/{chat_id}/messages/{id}
-
-# Agents
-GET    /api/agents
-GET    /api/agents/{id}
-POST   /api/agents
-PATCH  /api/agents/{id}
-DELETE /api/agents/{id}
-POST   /api/agents/{id}/execute
-
-# Knowledge Base
-GET    /api/kb
-GET    /api/kb/{id}
-POST   /api/kb
-PATCH  /api/kb/{id}
-DELETE /api/kb/{id}
-POST   /api/kb/{id}/documents
-DELETE /api/kb/{id}/documents/{doc_id}
-POST   /api/kb/{id}/search
-
-# MCP Servers
-GET    /api/mcp
-GET    /api/mcp/{id}
-POST   /api/mcp
-PATCH  /api/mcp/{id}
-DELETE /api/mcp/{id}
-POST   /api/mcp/{id}/test
-
-# Models
-GET    /api/models
-GET    /api/models/{id}
-POST   /api/models
-PATCH  /api/models/{id}
-DELETE /api/models/{id}
+# Workflows
+workflow.>
+# workflow.start, workflow.cancel, workflow.status
 
 # Admin
-GET    /api/admin/users
-GET    /api/admin/groups
-GET    /api/admin/agents
-GET    /api/admin/kb
-GET    /api/admin/mcp
-GET    /api/admin/models
+admin.>
+# admin.metrics, admin.logs, admin.config
+```
 
-# Observability
-GET    /api/admin/logs
-GET    /api/admin/metrics
-GET    /api/admin/traces
+### 3.2 API Endpoints (REST)
 
-# LLM Traces (specific)
-GET    /api/admin/llm-traces
-GET    /api/admin/llm-traces/{id}
+```
+# Authentication
+POST   /auth/login          # Login via credentials
+POST   /auth/register      # Register new user
+POST   /auth/logout       # Logout
+POST   /auth/refresh     # Refresh token
+GET    /auth/me          # Current user
+
+# Chats
+GET    /chats            # List user's chats
+POST   /chats            # Create new chat
+GET    /chats/:id        # Get chat details
+PATCH  /chats/:id        # Update chat
+DELETE /chats/:id        # Delete chat
+POST   /chats/:id/clear  # Clear chat messages
+
+# Messages
+GET    /chats/:id/messages     # List messages in chat
+POST   /chats/:id/messages    # Send message (non-streaming)
+GET    /chats/:id/stream      # Send message (streaming SSE)
+
+# Agents
+GET    /agents              # List available agents
+POST   /agents              # Create new agent
+GET    /agents/:id          # Get agent details
+PATCH  /agents/:id          # Update agent
+DELETE /agents/:id          # Delete agent
+POST   /agents/:id/execute   # Execute agent manually
+
+# Knowledge Bases
+GET    /knowledge-bases              # List knowledge bases
+POST   /knowledge-bases              # Create knowledge base
+GET    /knowledge-bases/:id          # Get KB details
+PATCH  /knowledge-bases/:id         # Update KB
+DELETE /knowledge-bases/:id          # Delete KB
+
+# Knowledge Base Documents
+GET    /knowledge-bases/:id/documents           # List documents
+POST   /knowledge-bases/:id/documents           # Upload document
+GET    /knowledge-bases/:id/documents/:docId      # Get document
+DELETE /knowledge-bases/:id/documents/:docId   # Delete document
+POST   /knowledge-bases/:id/documents/:docId/reembed  # Re-embed document
+
+# MCP Servers
+GET    /mcp-servers              # List MCP servers
+POST   /mcp-servers              # Create MCP server
+GET    /mcp-servers/:id          # Get server details
+PATCH  /mcp-servers/:id         # Update server
+DELETE /mcp-servers/:id          # Delete server
+POST   /mcp-servers/:id/test     # Test connection
+
+# MCP Tools
+GET    /mcp-servers/:id/tools     # List available tools
+POST   /mcp-servers/:id/tools/execute  # Execute tool
+
+# Models
+GET    /models              # List models
+POST   /models            # Add new model
+GET    /models/:id        # Get model details
+PATCH  /models/:id        # Update model
+DELETE /models/:id        # Delete model
+
+# Workflows
+GET    /workflows              # List workflows
+POST   /workflows              # Create workflow
+GET    /workflows/:id          # Get workflow details
+PATCH  /workflows/:id         # Update workflow
+DELETE /workflows/:id          # Delete workflow
+POST   /workflows/:id/execute  # Execute workflow
+GET    /workflows/:id/executions  # List executions
 
 # Service Accounts
-GET    /api/admin/service-accounts
-GET    /api/admin/service-accounts/{id}
-POST   /api/admin/service-accounts
-PATCH  /api/admin/service-accounts/{id}
-DELETE /api/admin/service-accounts/{id}
-POST   /api/admin/service-accounts/{id}/rotate-secret
+GET    /service-accounts              # List service accounts
+POST   /service-accounts              # Create service account
+GET    /service-accounts/:id          # Get account details
+PATCH  /service-accounts/:id         # Update account
+DELETE /service-accounts/:id          # Delete account
+POST   /service-accounts/:id/rotate  # Rotate secret
+POST   /service-accounts/:id/revoke   # Revoke account
 
-# Agent Workflows
-GET    /api/admin/agent-workflows
-GET    /api/admin/agent-workflows/{id}
-POST   /api/admin/agent-workflows
-PATCH  /api/admin/agent-workflows/{id}
-DELETE /api/admin/agent-workflows/{id}
-GET    /api/admin/agent-workflows/{id}/executions
-GET    /api/admin/agent-workflows/executions/{execution_id}
-GET    /api/admin/agent-workflows/executions/{execution_id}/logs
+# Admin Endpoints
 
-# User Logs (per user, all service accounts they have access to)
-GET    /api/admin/users/{user_id}/audit-logs
-GET    /api/admin/users/{user_id}/service-account-logs
+# Users Management
+GET    /admin/users              # List all users
+GET    /admin/users/:id        # Get user details
+PATCH  /admin/users/:id      # Update user
+DELETE /admin/users/:id      # Delete user
+GET    /admin/users/:id/logs  # Get user audit logs
+
+# Groups Management
+GET    /admin/groups              # List groups
+POST   /admin/groups              # Create group
+GET    /admin/groups/:id          # Get group details
+PATCH  /admin/groups/:id        # Update group
+DELETE /admin/groups/:id        # Delete group
+
+# Roles & Permissions
+GET    /admin/roles              # List roles
+POST   /admin/roles              # Create role
+GET    /admin/roles/:id        # Get role details
+PATCH  /admin/roles/:id        # Update role
+DELETE /admin/roles/:id        # Delete role
+
+# System Configuration
+GET    /admin/config              # Get configuration
+PATCH  /admin/config             # Update configuration
+
+# Observability
+GET    /admin/metrics            # System metrics
+GET    /admin/metrics/llm        # LLM-specific metrics
+GET    /admin/traces             # Distributed traces
+GET    /admin/logs               # Application logs
+GET    /admin/logs/search        # Search logs
+GET    /admin/health             # Health check
+
+# Model Gateway
+GET    /admin/gateway/models     # List deployed models
+POST   /admin/gateway/deploy    # Deploy new model
+POST   /admin/gateway/:id/scale # Scale model instance
+DELETE /admin/gateway/:id        # Undeploy model
 ```
 
 ---
 
-## 4. Component Specifications
+## 4. Mastra Integration
 
-### 4.1 LLM Engine
+### 4.1 Agent Setup with Mastra
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      LLM Engine Service                        │
-│                                                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │
-│  │   PydanticAI  │  │   Retry      │  │   Circuit    │         │
-│  │   Agent       │  │   Handler    │  │   Breaker    │         │
-│  └──────┬───────┘  └──────────────┘  └──────────────┘         │
-│         │                                                     │
-│  ┌──────┴───────┐  ┌──────────────┐  ┌──────────────┐         │
-│  │   Model      │  │   Token       │  │   Guardrails │         │
-│  │   Router     │  │   Pool        │  │   (Input/Out)│         │
-│  └──────────────┘  └──────────────┘  └──────────────┘         │
-│                                                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │
-│  │   Rate        │  │   Budget     │  │   Tracing    │         │
-│  │   Limiter     │  │   Tracker    │  │   (OpenAI)   │         │
-│  └──────────────┘  └──────────────┘  └──────────────┘         │
-└─────────────────────────────────────────────────────────────────┘
+```typescript
+// packages/mastra-tools/src/agents/realtime-agent.ts
+import { Agent, createAgent } from 'mastra';
+import { openai } from 'ai-extra'; // or use mastra's built-in
+
+const realtimeAgent = createAgent({
+  name: 'RealtimeAgent',
+  model: openai('gpt-4o'),
+  system: `You are a helpful AI assistant...`,
+  tools: {
+    knowledgeSearch: createKnowledgeSearchTool(kbService),
+    mcpTool: createMCPTool(mcpService),
+    // ... custom tools
+  },
+  maxSteps: 10,
+});
 ```
 
-### 4.2 Agent (ReAct Loop)
+### 4.2 Custom Tools for Mastra
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     ReAct Agent Loop                            │
-│                                                                  │
-│  ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐ │
-│  │  Think  │────▶│  Plan   │────▶│  Action │────▶│ Observe │ │
-│  └─────────┘     └─────────┘     └─────────┘     └────┬────┘ │
-│       ▲                                              │        │
-│       │                                              │        │
-│       └──────────────────────────────────────────────┘        │
-│                      (max_iterations)                          │
-└─────────────────────────────────────────────────────────────────┘
-
-Step:
-1. Think: Analyze context, decide if more steps needed
-2. Plan: Select tool/response based on available actions
-3. Action: Execute tool call or generate response
-4. Observe: Parse tool result, update context
-5. If tool_used: Add to message history, loop
-6. If final_answer: Return to user
-```
-
-### 4.3 Knowledge Base Service
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                  Knowledge Base Service                         │
-│                                                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │
-│  │   Ingest     │  │   Chunk      │  │   Embed      │         │
-│  │   Pipeline   │─▶│   Strategy   │─▶│   (Model)    │         │
-│  └──────────────┘  └──────────────┘  └──────┬───────┘         │
-│                                               │                 │
-│  ┌──────────────┐  ┌──────────────┐  ┌───────┴───────┐         │
-│  │   Search     │  │   Hybrid     │  │   Vector      │         │
-│  │   (Query)    │◀─│   (BM25+Emb) │◀─│   Store       │         │
-│  └──────┬───────┘  └──────────────┘  └───────────────┘         │
-│         │                                                      │
-│  ┌──────┴───────┐  ┌──────────────┐                            │
-│  │   Re-rank    │  │   Context    │                            │
-│  │   (Cross-enc)│─▶│   Builder    │                            │
-│  └──────────────┘  └──────────────┘                            │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 4.4 Rate Limiting Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                   Rate Limiting Layer                           │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │                    Redis Counters                         │  │
-│  │   user:{user_id}:requests:minutely  (600 req/min)        │  │
-│  │   user:{user_id}:tokens:daily       (1M tokens/day)      │  │
-│  │   user:{user_id}:budget:monthly    ($1000/month)         │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                                                                  │
-│  Limits per tier:                                                │
-│  ┌─────────┬────────────┬──────────┬───────────┐               │
-│  │  Tier   │  RPM       │  TPM/Day │  $/Month │               │
-│  ├─────────┼────────────┼──────────┼───────────┤               │
-│  │ Free    │ 10         │ 100K     │ $0        │               │
-│  │ Pro     │ 100        │ 1M       │ $50       │               │
-│  │ Team    │ 500        │ 10M      │ $500      │               │
-│  │ Enterprise│ Unlimited │ Unlimited │ Custom   │               │
-│  └─────────┴────────────┴──────────┴───────────┘               │
-└─────────────────────────────────────────────────────────────────┘
+```typescript
+// packages/mastra-tools/src/tools/knowledge.ts
+export function createKnowledgeSearchTool(kbService: KnowledgeBaseService) {
+  return {
+    name: 'knowledge_search',
+    description: 'Search knowledge base for relevant information',
+    schema: z.object({
+      query: z.string(),
+      knowledgeBaseId: z.string(),
+      limit: z.number().default(5),
+    }),
+    execute: async ({ query, knowledgeBaseId, limit }) => {
+      const results = await kbService.search(knowledgeBaseId, query, { limit });
+      return { results };
+    },
+  };
+}
 ```
 
 ---
 
-## 5. Security
+## 5. Observability
 
-### 5.1 Authentication Flow
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                  Authentication Flow                            │
-│                                                                  │
-│  1. User ──▶ POST /auth/login ──▶ Ory Kratos                   │
-│                    │                                            │
-│                    ▼                                            │
-│  2. Kratos validates credentials                                 │
-│                    │                                            │
-│                    ▼                                            │
-│  3. Return session token (Ory Kratos)                          │
-│                                                                  │
-│  4. Client ──▶ API Request + Bearer Token                       │
-│                    │                                            │
-│                    ▼                                            │
-│  5. Gateway validates token with Kratos                        │
-│                    │                                            │
-│                    ▼                                            │
-│  6. Request + user_id ──▶ Keto (check permission)              │
-│                                                                  │
-│  7. Allow/Deny ──▶ Process request                              │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 5.2 OAuth2 / OIDC (for external clients)
+### 5.1 Metrics
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                  OAuth2 Flow (Ory Hydra)                       │
-│                                                                  │
-│  CLI/Desktop App ──▶ OAuth2 Authorization Code Flow            │
-│                                                                  │
-│  1. Client ──▶ /oauth2/auth (authorize)                        │
-│  2. User login via Kratos                                       │
-│  3. Consent screen                                              │
-│  4. Return authorization code                                   │
-│  5. Client ──▶ /oauth2/token (exchange code)                   │
-│  6. Return access_token + refresh_token                         │
-│                                                                  │
-│  Scopes:                                                        │
-│  - chat:read, chat:write                                        │
-│  - agent:execute                                                │
-│  - kb:read, kb:write                                           │
-│  - admin:*                                                      │
-└─────────────────────────────────────────────────────────────────┘
+# Application Metrics (prom-client)
+- http_requests_total
+- http_request_duration_seconds
+- nats_messages_total
+- nats_message_duration_seconds
+
+# Business Metrics
+- chats_created_total
+- messages_sent_total
+- agents_executed_total
+- kb_queries_total
+
+# LLM Metrics
+- llm_requests_total
+- llm_requests_duration_seconds
+- llm_tokens_used_total
+- llm_errors_total
+
+# Agent Metrics
+- agent_iterations_total
+- agent_tools_called_total
+- agent_errors_total
+
+# Workflow Metrics
+- workflow_executions_total
+- workflow_duration_seconds
+- workflow_failures_total
 ```
 
----
+### 5.2 Logs Structure
 
-## 6. Observability
-
-### 6.1 Metrics
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Metrics Stack                              │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │                 VictoriaMetrics                          │   │
-│  │                                                           │   │
-│  │  Application Metrics:                                    │   │
-│  │  - api_request_total{endpoint, method, status}          │   │
-│  │  - api_request_duration_seconds{endpoint}              │   │
-│  │  - active_connections{service}                          │   │
-│  │  - nats_message_total{subject, action}                  │   │
-│  │                                                           │   │
-│  │  LLM Metrics:                                            │   │
-│  │  - llm_request_total{model, provider}                   │   │
-│  │  - llm_tokens_total{model, direction}                   │   │
-│  │  - llm_latency_seconds{model}                           │   │
-│  │  - llm_error_total{model, error_type}                   │   │
-│  │  - llm_cost_total{model}                                │   │
-│  │                                                           │   │
-│  │  Business Metrics:                                       │   │
-│  │  - active_users_total                                    │   │
-│  │  - chat_messages_total                                   │   │
-│  │  - agent_executions_total{status}                       │   │
-│  │  - kb_documents_total{kb_id}                            │   │
-│  └──────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
+```json
+{
+  "timestamp": "2024-01-15T10:30:00Z",
+  "level": "INFO",
+  "service": "api",
+  "traceId": "abc123",
+  "spanId": "def456",
+  "userId": "user_123",
+  "action": "chat.message.send",
+  "durationMs": 150,
+  "message": "Message sent successfully"
+}
 ```
 
-### 6.2 Tracing
+### 5.3 Tracing Spans
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Distributed Tracing                         │
-│                                                                  │
-│  Trace spans:                                                   │
-│                                                                  │
-│  [HTTP Request]                                                 │
-│     │                                                           │
-│     ├─▶ [Auth Check] ──▶ Kratos                                 │
-│     │                                                           │
-│     ├─▶ [Permission Check] ──▶ Keto                            │
-│     │                                                           │
-│     ├─▶ [Database Query]                                        │
-│     │                                                           │
-│     ├─▶ [NATS Publish]                                          │
-│     │                                                           │
-│     │    [Async: Agent Execution]                              │
-│     │         │                                                  │
-│     │         ├─▶ [LLM: Think] ──▶ Model Gateway               │
-│     │         │                                                  │
-│     │         ├─▶ [LLM: Tool Call] ──▶ Tool Service           │
-│     │         │                                                  │
-│     │         └─▶ [LLM: Final Response] ──▶ Model Gateway      │
-│     │                                                           │
-│     └─▶ [Response]                                              │
-│                                                                  │
-│  Tools: OpenTelemetry → Tempo/Grafana                          │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 6.3 Logs
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Log Structure                            │
-│                                                                  │
-│  JSON format with fields:                                       │
-│  {                                                              │
-│    "timestamp": "2025-01-01T12:00:00Z",                        │
-│    "level": "INFO",                                            │
-│    "service": "chat-service",                                  │
-│    "trace_id": "abc123",                                       │
-│    "user_id": "user-456",                                      │
-│    "action": "message.send",                                   │
-│    "resource_type": "chat",                                    │
-│    "resource_id": "chat-789",                                  │
-│    "duration_ms": 150,                                         │
-│    "status": "success",                                        │
-│    "error": null                                                │
-│  }                                                              │
-│                                                                  │
-│  Collected via: Vector → Loki                                   │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 6.4 Alerting
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Alert Rules                                │
-│                                                                  │
-│  Critical (PagerDuty):                                          │
-│  - service_down{service="llm-gateway"}                         │
-│  - high_error_rate{rate="5m"} > 5%                             │
-│  - database_down                                                │
-│  - nats_connection_failed                                       │
-│                                                                  │
-│  Warning (Slack):                                               │
-│  - high_latency_p99 > 5s                                       │
-│  - rate_limit_near_limit > 80%                                 │
-│  - disk_space < 10%                                             │
-│  - memory_usage > 85%                                           │
-│                                                                  │
-│  Info (Email):                                                  │
-│  - user_signup_spike                                            │
-│  - new_agent_created                                            │
-│  - model_added                                                  │
-└─────────────────────────────────────────────────────────────────┘
+# Spans
+- http.request (incoming HTTP request)
+- nats.publish (NATS message publish)
+- nats.subscribe (NATS message handling)
+- llm.request (LLM API call)
+- agent.step (ReAct loop iteration)
+- tool.execution (Tool execution)
+- kb.search (Knowledge base search)
+- db.query (Database query)
 ```
 
 ---
 
-## 7. Admin Panel
+## 6. Security
 
-### 7.1 Pages Structure
-
-```
-/admin
-├── /dashboard
-│   ├── Stats cards (users, chats, agents, models)
-│   ├── Activity chart
-│   └── Quick actions
-│
-├── /users
-│   ├── User list (search, filter, pagination)
-│   ├── User detail (edit, roles, groups)
-│   └── User create
-│
-├── /groups
-│   ├── Group tree (hierarchical view)
-│   ├── Group detail (members, children)
-│   └── Group create/edit
-│
-├── /agents
-│   ├── Agent list (status, owner)
-│   ├── Agent detail (edit, test)
-│   ├── Agent create
-│   └── Agent logs/traces
-│
-├── /knowledge-bases
-│   ├── KB list
-│   ├── KB detail (documents, config)
-│   ├── KB create/edit
-│   └── Document viewer
-│
-├── /mcp-servers
-│   ├── Server list
-│   ├── Server detail (test connection)
-│   └── Server create/edit
-│
-├── /models
-│   ├── Model list (provider, status)
-│   ├── Model detail (config, health)
-│   ├── Model create/edit
-│   └── Model logs
-│
-├── /roles
-│   ├── Role list
-│   ├── Role create/edit
-│   └── Permission matrix
-│
-├── /settings
-│   ├── Platform settings
-│   ├── Feature flags
-│   └── Integration configs
-│
-├── /logs
-│   ├── Log viewer (filterable)
-│   ├── Log search
-│   └── Export
-│
-├── /mcp-tools
-│   ├── Tool list (per server)
-│   ├── Tool usage logs
-│   └── Tool testing
-│
-├── /service-accounts
-│   ├── Account list
-│   ├── Account detail (permissions, usage)
-│   ├── Account create/edit
-│   └── Account logs
-│
-├── /agent-workflows
-│   ├── Workflow list
-│   ├── Workflow detail (definition, executions)
-│   ├── Workflow create/edit
-│   ├── Execution history
-│   ├── Execution logs (per step)
-│   └── Execution metrics
-│
-├── /users/{id}/logs
-│   ├── User audit logs
-│   └── Service account access logs
-│
-├── /metrics
-│   ├── System metrics (CPU, memory, disk)
-│   ├── API metrics
-│   ├── LLM metrics
-│   └── Custom dashboards
-│
-└── /traces
-    ├── Trace list
-    ├── Trace detail
-    └── LLM trace viewer (chat-like visualization)
-```
-
-### 7.2 Tech Stack
+### 6.1 Authentication Flow
 
 ```
-Frontend: SvelteKit 2.x (public user app)
-├── shadcn-svelte (UI components)
-├── TanStack Query (server state)
-├── Axios (HTTP client)
-├── TailwindCSS (styling)
-├── Theme: Oxford Blue (#002147) accent
-└── Auth: Ory Kratos + Oathkeeper
+1. User → POST /auth/login (email + password)
+2. API → Kratos (validate credentials)
+3. Kratos → Return session token
+4. API → Set HTTP-only session cookie
+5. Subsequent requests → Cookie-based auth
 
-Admin: SvelteKit 2.x (separate project)
-├── shadcn-svelte (UI components)
-├── TanStack Query (server state)
-├── Axios (HTTP client)
-├── TailwindCSS (styling)
-├── Theme: Oxford Blue (#002147) accent
-└── Auth: Ory Kratos + Oathkeeper (admin role required)
+# Service Account Flow
+1. Service → POST /auth/service-token (client_id + client_secret)
+2. API → Validate, check rate limits
+3. API → Return access token (JWT)
+4. Subsequent requests → Bearer token
+```
 
-BFF Layer (embedded in each SvelteKit):
-├── Auth via Ory Kratos session
-├── Proxy to core NATS/FastAPI
-└── Data transformation
+### 6.2 Authorization (ReBAC)
+
+```
+# Check permission before each action
+1. Extract user/group from session
+2. Extract resource ID from request
+3. NATS request to Keto: check_relation
+4. Keto → Return allowed/denied
+5. Continue or 403
+```
+
+### 6.3 Guardrails (Future)
+
+```
+# Input validation
+- Content filter
+- PII detection
+- Rate limiting per user
+
+# Output validation
+- Toxicity detection
+- PII filtering
+- Format validation
 ```
 
 ---
 
-## 8. Model Gateway
+## 7. Deployment
 
-### 8.1 Architecture
+### 7.1 Docker Compose (Development)
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Model Gateway Service                        │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │                    API Layer                             │   │
-│  │   OpenAI-compatible /v1/chat/completions                │   │
-│  │   OpenAI-compatible /v1/embeddings                      │   │
-│  │   OpenAI-compatible /v1/models                          │   │
-│  └──────────────────────────┬─────────────────────────────┘   │
-│                             │                                    │
-│  ┌──────────────────────────┴─────────────────────────────┐   │
-│  │                   Router                                  │   │
-│  │   - Route by model ID                                     │   │
-│  │   - Fallback handling                                     │   │
-│  │   - Load balancing                                        │   │
-│  └──────────────────────────┬─────────────────────────────┘   │
-│                             │                                    │
-│  ┌────────────┐  ┌─────────┴────────┐  ┌────────────┐         │
-│  │  Cloud     │  │   Local          │  │  Embedding  │         │
-│  │  Providers │  │   (SGLang/vLLM) │  │   Models    │         │
-│  │            │  │                  │  │             │         │
-│  │ - OpenAI   │  │ - Llama          │  │ - nomic     │         │
-│  │ - Anthropic│  │ - Qwen           │  │ - bge       │         │
-│  │ - Groq     │  │ - Mistral        │  │ - e5        │         │
-│  └────────────┘  └──────────────────┘  └────────────┘         │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │              Auto-provisioning (future)                  │   │
-│  │   - Kubernetes operator for SGLang/vLLM                 │   │
-│  │   - GPU allocation on demand                             │   │
-│  │   - Health monitoring                                    │   │
-│  └──────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
+```yaml
+services:
+  api:
+    build: ./apps/api
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:5432/llmplatform
+      - NATS_URL=nats://nats:4222
+  
+  nats:
+    image: nats:2.10
+    ports:
+      - "4222:4222"
+  
+  postgres:
+    image: postgres:16
+    ports:
+      - "5432:5432"
+  
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+  
+  temporal:
+    image: temporalio/auto-setup
+    ports:
+      - "7233:7233"
 ```
 
-### 8.2 Deployment Options
+### 7.2 Kubernetes (Production)
 
 ```
-Infrastructure:
-- 3x servers with 4x NVIDIA RTX 6000 (24 GPUs total)
-- 2x AMD EPYC processors per server
-- Total: ~150GB VRAM for inference
-- Network: 100GbE between servers
-
-Local Models (Phase 1):
-├── SGLang single-node (per GPU)
-├── vLLM single-node (per GPU)
-└── Manual deployment via Docker Compose
-
-Auto-provisioning (Phase 2):
-├── Kubernetes operator (future)
-├── Helm charts
-├── GPU scheduling
-└── Auto-scaling policies
+# Planned for K8s deployment
+# - HorizontalPodAutoscaler for API
+# - GPU nodes for vLLM/SGLang
+# - Persistent volumes for PostgreSQL
+# - Services mesh for NATS
 ```
 
 ---
 
-## 9. Testing Strategy
+## 8. Testing Strategy
 
-### 9.1 Test Pyramid
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Test Pyramid                             │
-│                                                                  │
-│                    ┌───────────────┐                             │
-│                    │     E2E       │  ~50 tests                 │
-│                    │   (Cypress)   │                            │
-│                    └───────┬───────┘                            │
-│                    ┌───────┴───────┐                            │
-│                    │   Integration │  ~200 tests                │
-│                    │    (pytest)   │                            │
-│                    └───────┬───────┘                            │
-│                    ┌───────┴───────┐                            │
-│                    │     Unit      │  ~500 tests                │
-│                    │    (pytest)   │                            │
-│                    └───────────────┘                            │
-│                                                                  │
-│  Coverage targets:                                               │
-│  - Unit: 80%+                                                   │
-│  - Integration: 70%+                                           │
-│  - E2E: Critical paths                                          │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 9.2 Test Types
+### 8.1 Test Types
 
 ```
-Unit Tests:
-├── Domain models validation
-├── Service logic
-├── Permission checks
-├── Rate limiting logic
-└── Data transformations
+- Unit Tests (Jest/Vitest)
+  - Domain logic
+  - Utility functions
+  - DTO validation
 
-Integration Tests:
-├── API endpoints
-├── NATS message flows
-├── Database operations
-├── Ory integration (Kratos, Hydra, Keto)
-└── External API mocks (OpenAI, Anthropic)
+- Integration Tests (Supertest)
+  - API endpoints
+  - NATS handlers
+  - Database operations
 
-E2E Tests:
-├── User login flow
-├── Chat with agent
-├── Knowledge base search
-├── Admin CRUD operations
-└── OAuth2 flow
+- E2E Tests (Playwright)
+  - Critical user flows
+  - Admin workflows
+
+- Contract Tests
+  - NATS message contracts
+  - API contracts
+
+- Load Tests
+  - k6 or autocannon
+  - Realistic load scenarios
+```
+
+### 8.2 Coverage Targets
+
+```
+- Unit: 80%+
+- Integration: 70%+
+- Critical E2E: 100%
 ```
 
 ---
 
-## 10. Implementation Phases
+## 9. Admin Panel Pages
 
-### Phase 1: Foundation (4 weeks)
-- [ ] Infrastructure setup (Docker Compose / K8s)
-- [ ] PostgreSQL schema + migrations
-- [ ] Redis cluster
-- [ ] NATS JetStream setup
-- [ ] Ory stack deployment (Kratos, Hydra, Keto)
+### 9.1 Dashboard (`/admin`)
 
-### Phase 2: Core Platform (6 weeks)
-- [ ] FastAPI application structure
-- [ ] Dishka DI setup
-- [ ] User management API
-- [ ] Group management API
-- [ ] Chat & Message API
-- [ ] Authentication flow
+- System overview cards
+- Quick stats (users, chats, models)
+- Recent activity
+- Health status
 
-### Phase 3: LLM Engine (4 weeks)
-- [ ] PydanticAI integration
-- [ ] Model gateway (basic routing)
-- [ ] ReAct agent implementation
-- [ ] Tool system
-- [ ] Rate limiting
-- [ ] Guardrails (input/output)
+### 9.2 Users (`/admin/users`)
 
-### Phase 4: Knowledge Base (4 weeks)
-- [ ] Document ingestion pipeline
-- [ ] Chunking strategies
-- [ ] Embedding pipeline
-- [ ] Vector store integration (Qdrant)
-- [ ] Search API
-- [ ] Hybrid search
+- User list with filters
+- User details view
+- Role assignment
+- Group membership
+- Audit logs
 
-### Phase 5: MCP Integration (3 weeks)
-- [ ] MCP protocol support
-- [ ] Server management
-- [ ] Tool registration
-- [ ] Audit logging
-- [ ] Permission checks
+### 9.3 Groups (`/admin/groups`)
 
-### Phase 6: Admin Panel (4 weeks)
-- [ ] SvelteKit setup
-- [ ] shadcn-svelte integration
-- [ ] CRUD pages for all entities
-- [ ] Log viewer
-- [ ] Metrics dashboard
-- [ ] Trace viewer
+- Hierarchical tree view
+- Create/edit/delete
+- Member management
 
-### Phase 7: Observability (3 weeks)
-- [ ] VictoriaMetrics setup
-- [ ] Grafana dashboards
-- [ ] Loki log aggregation
-- [ ] Alert rules
-- [ ] LLM tracing
+### 9.4 Chats (`/admin/chats`)
 
-### Phase 8: Production Ready (2 weeks)
-- [ ] Load testing
-- [ ] Security audit
-- [ ] Performance tuning
-- [ ] Documentation
-- [ ] Runbooks
+- Chat list
+- Chat preview
+- Message history
+- Export functionality
 
----
+### 9.5 Agents (`/admin/agents`)
 
-## 11. Open Questions (ANSWERED)
+- Agent list
+- Create/edit wizard
+- Tool configuration
+- Execution history
+- Performance metrics
 
-### Infrastructure
+### 9.6 Knowledge Bases (`/admin/knowledge-bases`)
 
-| Question | Answer |
-|----------|--------|
-| GPU Infrastructure | On-premise DC, 3 servers with 4x RTX 6000 each + 2x AMD EPYC |
-| Cloud vs Local | 100% local (for now), preparing for gateway mode |
-| Data Retention | 1 year |
+- KB list
+- Create/edit configuration
+- Document management
+- Search testing
 
-### Multi-Tenancy
+### 9.7 MCP Servers (`/admin/mcp-servers`)
 
-| Question | Answer |
-|----------|--------|
-| Architecture | Multi-tenant by departments/groups |
-| Isolation | Each department = separate group hierarchy in Keto |
+- Server list
+- Add/edit server
+- Tool testing
+- Usage logs
 
-### Misc
+### 9.8 Models (`/admin/models`)
 
-| Question | Answer |
-|----------|--------|
-| Migration | No existing code to migrate |
-| Compliance | TBD if needed |
+- Model list
+- Add/edit model
+- Performance metrics
+- Health status
 
----
+### 9.9 Workflows (`/admin/workflows`)
 
-*Last Updated: 2025-01-20*
-*Version: 1.0*
+- Workflow list
+- Create/edit workflow
+- Execution history
+- Visualization
+
+### 9.10 Service Accounts (`/admin/service-accounts`)
+
+- Account list
+- Create/edit account
+- Usage statistics
+- Rotate/revoke
+
+### 9.11 System (`/admin/system`)
+
+- Configuration editor
+- Feature flags
+- Maintenance mode
+
+### 9.12 Observability (`/admin/observability`)
+
+- Metrics dashboard
+- LLM metrics dashboard
+- Trace explorer
+- Log viewer
+- Alert configuration
