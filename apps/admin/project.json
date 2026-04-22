@@ -7,15 +7,15 @@
     "dev": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "cd apps/admin && pnpm dev",
-        "cwd": "{workspaceRoot}"
+        "command": "vite dev --port 3000",
+        "cwd": "{projectRoot}"
       }
     },
     "build": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "cd apps/admin && pnpm build",
-        "cwd": "{workspaceRoot}"
+        "command": "vite build",
+        "cwd": "{projectRoot}"
       }
     }
   }
