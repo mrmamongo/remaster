@@ -142,7 +142,7 @@ services:
       - postgres
 
   # ============================================================================
-  # OBSERVABILITY — Victoria Stack
+  # VICTORIA STACK (Observability)
   # ============================================================================
 
   victoriametrics:
@@ -156,69 +156,12 @@ services:
     ports:
       - "8428:8428"
       - "8089:8089"
+      - "9090:9090"
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8428/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-
-  loki:
-    image: grafana/loki:3.0
-    command: -config.file=/etc/loki/local-config.yaml
-    volumes:
-      - loki_data:/loki
-    ports:
-      - "3100:3100"
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3100/ready"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  tempo:
-    image: grafana/tempo:2.4
-    command: -config.file=/etc/tempo/config.yaml
-    volumes:
-      - tempo_data:/var/tempo
-    ports:
-      - "4317:4317"
-      - "4318:4318"
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:4317/ready"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  grafana:
-    image: grafana/grafana:11.0
-    volumes:
-      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
-      - grafana_data:/var/lib/grafana
-    environment:
-      GF_AUTH_ANONYMOUS_ENABLED: ${GRAFANA_ANONYMOUS:-false}
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
-    ports:
-      - "3000:3000"
-    depends_on:
-      - victoriametrics
-      - loki
-      - tempo
-
-  # ============================================================================
-  # VECTOR (Log Agent)
-  # ============================================================================
-
-  vector:
-    image: timberio/vector:0.41
-    volumes:
-      - ./vector/vector.toml:/etc/vector/vector.toml:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    ports:
-      - "9001:9001"
-    environment:
-      VECTOR_LOG: info
 
   # ============================================================================
   # APPLICATION
@@ -274,6 +217,19 @@ services:
     depends_on:
       - api
 
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+    environment:
+      PUBLIC_API_URL: http://api:8080
+      VICTORIA_URL: http://victoriametrics:8428
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+      - victoriametrics
+
 volumes:
   postgres_data:
   nats_data:
@@ -283,15 +239,34 @@ volumes:
   keto_data:
   hydra_data:
   victoria_data:
-  loki_data:
-  tempo_data:
-  grafana_data:
   qdrant_data:
 ```
 
 ---
 
-## 2. Environment Variables
+## 2. Service Ports
+
+| Service | Port | Internal | Description |
+|---------|------|----------|-------------|
+| **API** | 8080 | :8080 | NestJS API |
+| **Frontend** | 5173 | :5173 | SvelteKit |
+| **Admin Panel** | 3000 | :3000 | Grafana-like dashboards |
+| **PostgreSQL** | 5432 | :5432 | Main DB |
+| **NATS** | 4222 | :4222 | Messaging |
+| **NATS Monitor** | 8222 | :8222 | NATS monitoring |
+| **Redis** | 6379 | :6379 | Cache + Sessions |
+| **MinIO** | 9000 | :9000 | S3 API |
+| **MinIO Console** | 9001 | :9001 | Admin UI |
+| **VictoriaMetrics** | 8428 | :8428 | Metrics + PromQL |
+| **Qdrant** | 6333 | :6333 | Vector DB |
+| **Krato** | 4433/4434 | :4433 | Auth API |
+| **Keto** | 4460/4461 | :4460 | Permissions |
+| **Oathkeeper** | 4455/4456 | :4455 | API Gateway |
+| **Hydra** | 4444/4445 | :4444 | OAuth2 |
+
+---
+
+## 3. Environment Variables
 
 ```bash
 # .env
@@ -315,13 +290,6 @@ MINIO_USER=minioadmin
 MINIO_PASSWORD=minioadmin_secure
 
 # ============================================================================
-# Grafana
-# ============================================================================
-GRAFANA_ADMIN=admin
-GRAFANA_PASSWORD=admin_secure
-GRAFANA_ANONYMOUS=false
-
-# ============================================================================
 # Ory
 # ============================================================================
 # Kratos — session secrets (generate random)
@@ -338,31 +306,6 @@ HYDRA_SECRETS_DEFAULT=replace_with_random_secret_here
 JWT_SECRET=your_jwt_secret_at_least_32_bytes
 ENCRYPTION_KEY=your_encryption_key_32_bytes
 ```
-
----
-
-## 3. Service Ports
-
-| Service | Port | Internal | Description |
-|---------|------|----------|-------------|
-| **API** | 8080 | :8080 | NestJS API |
-| **Frontend** | 5173 | :5173 | SvelteKit |
-| **PostgreSQL** | 5432 | :5432 | Main DB |
-| **NATS** | 4222 | :4222 | Messaging |
-| **NATS Monitor** | 8222 | :8222 | NATS monitoring |
-| **Redis** | 6379 | :6379 | Cache + Sessions |
-| **MinIO** | 9000 | :9000 | S3 API |
-| **MinIO Console** | 9001 | :9001 | Admin UI |
-| **Grafana** | 3000 | :3000 | Dashboards |
-| **VictoriaMetrics** | 8428 | :8428 | Metrics + PromQL |
-| **Loki** | 3100 | :3100 | Log aggregation |
-| **Tempo** | 4317 | :4317 | Traces (OTLP) |
-| **Vector Agent** | 9001 | :9001 | Log forwarder |
-| **Qdrant** | 6333 | :6333 | Vector DB |
-| **Krato** | 4433/4434 | :4433 | Auth API |
-| **Keto** | 4460/4461 | :4460 | Permissions |
-| **Oathkeeper** | 4455/4456 | :4455 | API Gateway |
-| **Hydra** | 4444/4445 | :4444 | OAuth2 |
 
 ---
 
@@ -526,75 +469,170 @@ spec:
                 name: llm-platform-config
 ```
 
-### K3s Services
-```yaml
-# PostgreSQL, NATS, Redis — as StatefulSets
-# MinIO — with persistence
-# Ory Stack — with proper networking
-# Victoria Stack — with persistent storage
-# API, Worker, Frontend — Deployments with HPA
-```
-
 ---
 
-## 8. Observability Configuration
+## 8. Admin Panel — Grafana-like Dashboards
 
-### VictoriaMetrics Scraping
-```yaml
-# prometheus.yml
-global:
-  scrape_interval: 15s
+Админ-панель построена на SvelteKit + TanStack Query с дашбордами как в Grafana.
 
-scrape_configs:
-  - job_name: 'llm-platform'
-    static_configs:
-      - targets: ['api:8080']
-        labels:
-          service: 'api'
-  
-  - job_name: 'llm-workers'
-    static_configs:
-      - targets: ['worker:8080']
-        labels:
-          service: 'worker'
+### Dashboard Structure
 
-  - job_name: 'node-exporter'
-    static_configs:
-      - targets: ['node-exporter:9100']
-```
-
-### Loki Pipeline (Vector)
-```toml
-# vector.toml
-[sources.docker]
-type = "docker_logs"
-
-[sinks.loki]
-type = "loki"
-endpoint = "http://loki:3100"
-
-[sinks.loki.encoding]
-codec = "json"
-```
-
-### OpenTelemetry
 ```typescript
-// apps/api/src/main.ts
-import { NodeSDK } from '@opentelemetry/sdk-node';
-import { JaegerExporter } from '@opentelemetry/exporter-jaeger';
-import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
-import { NestInstrumentation } from '@opentelemetry/instrumentation-nestjs';
+// apps/admin/src/lib/dashboards/
+interface Dashboard {
+  id: string;
+  name: string;
+  description: string;
+  panels: DashboardPanel[];
+  refreshInterval: number;      // seconds
+  timeRange: TimeRange;
+}
 
-const sdk = new NodeSDK({
-  serviceName: 'llm-platform-api',
-  traceExporter: new JaegerExporter({
-    endpoint: 'http://tempo:4317/api/traces',
-  }),
-  instrumentations: [
-    new HttpInstrumentation(),
-    new NestInstrumentation(),
-  ],
-});
+interface DashboardPanel {
+  id: string;
+  type: 'graph' | 'stat' | 'table' | 'log' | 'trace' | 'heatmap';
+  title: string;
+  layout: {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  };
+  query: PanelQuery;
+  options: Record<string, any>;
+}
+
+interface PanelQuery {
+  type: 'metrics' | 'logs' | 'traces';
+  promQL?: string;              // Victoria Metrics
+  logQL?: string;             // Victoria Logs
+  traceQL?: string;           // Victoria Traces
+}
+```
+
+### Built-in Dashboards
+
+#### 1. System Overview
+| Panel | Type | Query |
+|-------|------|-------|
+| API RPS | Graph | `sum(rate(http_requests_total[5m]))` |
+| API Latency p50/p95/p99 | Graph | `histogram_quantile(0.50, rate(http_request_duration_seconds_bucket[5m]))` |
+| Error Rate | Stat | `sum(rate(http_errors_total[5m])) / sum(rate(http_requests_total[5m])) * 100` |
+| Active Users | Stat | `sum(http_active_sessions)` |
+| CPU Usage | Graph | `avg(rate(process_cpu_seconds_total[5m]))` |
+| Memory Usage | Graph | `process_resident_memory_bytes` |
+
+#### 2. LLM Metrics
+| Panel | Type | Query |
+|-------|------|-------|
+| Requests/sec by Model | Graph | `sum by (model) (rate(llm_requests_total[5m]))` |
+| Tokens/sec | Graph | `sum(rate(llm_tokens_total[5m]))` |
+| Cost/hour | Stat | `sum(rate(llm_cost_total[1h]))` |
+| Latency by Model | Heatmap | `histogram_quantile(0.95, rate(llm_latency_seconds_bucket[5m]))` |
+| Model Usage Distribution | Table | `topk(10, sum by (model) (llm_requests_total))` |
+| Failed Requests | Graph | `sum by (model, error) (rate(llm_errors_total[5m]))` |
+
+#### 3. Chat Analytics
+| Panel | Type | Query |
+|-------|------|-------|
+| Active Chats | Stat | `llm_active_chats` |
+| Messages/sec | Graph | `sum(rate(chat_messages_total[5m]))` |
+| Avg Response Time | Stat | `avg(chat_response_time_seconds)` |
+| Messages by Role | Graph | `sum by (role) (rate(chat_messages_total[5m]))` |
+| Top Chats by Messages | Table | `topk(10, chat_messages_total)` |
+
+#### 4. Agent Execution
+| Panel | Type | Query |
+|-------|------|-------|
+| Active Agents | Stat | `agent_executions_active` |
+| Completed/min | Graph | `sum(rate(agent_executions_completed_total[5m]))` |
+| Failed/min | Graph | `sum(rate(agent_executions_failed_total[5m]))` |
+| Avg Steps to Complete | Stat | `avg(agent_execution_steps_total)` |
+| Tool Usage | Table | `topk(10, sum by (tool) (agent_tool_calls_total))` |
+| Execution Time by Agent | Heatmap | `histogram_quantile(0.95, rate(agent_execution_duration_seconds_bucket[5m]))` |
+
+#### 5. Knowledge Base
+| Panel | Type | Query |
+|-------|------|-------|
+| Indexed Documents | Stat | `knowledge_documents_total` |
+| Search Requests/sec | Graph | `sum(rate(knowledge_search_total[5m]))` |
+| Search Latency | Heatmap | `histogram_quantile(0.95, rate(knowledge_search_duration_seconds_bucket[5m]))` |
+| Indexing Status | Table | `knowledge_indexing_status` |
+| Storage Used | Stat | `knowledge_storage_bytes` |
+
+#### 6. MCP Servers
+| Panel | Type | Query |
+|-------|------|-------|
+| Active Connections | Stat | `mcp_connections_active` |
+| Requests/sec | Graph | `sum(rate(mcp_requests_total[5m]))` |
+| Tool Executions | Graph | `sum by (server, tool) (rate(mcp_tool_calls_total[5m]))` |
+| Server Health | Table | `mcp_server_status` |
+| Latency by Server | Heatmap | `histogram_quantile(0.95, rate(mcp_latency_seconds_bucket[5m]))` |
+
+#### 7. Infrastructure
+| Panel | Type | Query |
+|-------|------|-------|
+| Database Connections | Graph | `pg_stat_database_connections` |
+| NATS Messages/sec | Graph | `sum(rate(nats_messages_total[5m]))` |
+| NATS Queue Depth | Graph | `nats_queue_depth` |
+| Redis Memory | Graph | `redis_memory_used_bytes` |
+| Qdrant Collection Size | Graph | `qdrant_collection_points_count` |
+
+#### 8. Logs
+| Panel | Type | Query |
+|-------|------|-------|
+| Error Logs | Log | `level="error" | message` |
+| Recent Errors | Table | `{"level":"error"} | sort by (timestamp desc) | limit 100` |
+| Logs by Service | Graph | `sum by (service) (rate(logs_total[5m]))` |
+
+#### 9. Traces
+| Panel | Type | Query |
+|-------|------|-------|
+| Trace List | Trace | `service=llm-platform-api | sort by (timestamp desc) | limit 50` |
+| Trace Duration | Heatmap | `histogram_quantile(0.95, trace_duration_seconds_bucket)` |
+| Error Traces | Table | `{"status":"error"} | sort by (timestamp desc) | limit 20` |
+
+#### 10. Audit Logs (Admin)
+| Panel | Type | Query |
+|-------|------|-------|
+| Actions by User | Table | `audit_actions | sort by (timestamp desc) | limit 100` |
+| Resource Changes | Table | `audit_resources | sort by (timestamp desc) | limit 50` |
+| Failed Auth Attempts | Graph | `sum by (reason) (rate(auth_failures_total[5m]))` |
+
+### Admin API Endpoints
+
+```
+# ============================================================================
+# Configuration
+# ============================================================================
+GET    /api/admin/config              # System config
+PATCH  /api/admin/config/:key         # Update config
+
+# ============================================================================
+# Entities Management
+# ============================================================================
+GET    /api/admin/entities             # List all entities
+GET    /api/admin/entities/:type        # List by type
+GET    /api/admin/entities/:type/:id    # Get entity
+DELETE /api/admin/entities/:type/:id  # Delete entity
+
+# ============================================================================
+# Logs & Traces
+# ============================================================================
+GET    /api/admin/logs                # Query logs (Victoria Logs)
+GET    /api/admin/traces                # Query traces (Victoria Traces)
+
+# ============================================================================
+# Metrics
+# ============================================================================
+GET    /api/admin/metrics              # Query metrics (Victoria Metrics)
+GET    /api/admin/metrics/:name       # Get specific metric
+
+# ============================================================================
+# Audit
+# ============================================================================
+GET    /api/admin/audit               # Audit logs
+GET    /api/admin/audit/:userId         # User audit history
 ```
 
 ---
@@ -605,14 +643,13 @@ const sdk = new NodeSDK({
 |---------|----------|----------|
 | API | `GET /health` | `{"status":"ok"}` |
 | Worker | `GET /health` | `{"status":"ok"}` |
+| Admin | `GET /health` | `{"status":"ok"}` |
 | NATS | `GET /healthz` | `{"status":"ok"}` |
 | PostgreSQL | `pg_isready` | `0` |
 | Redis | `redis-cli ping` | `PONG` |
 | MinIO | `GET /minio/health/live` | `200` |
 | Qdrant | `GET /health` | `200` |
 | VictoriaMetrics | `GET /health` | `200` |
-| Loki | `GET /ready` | `200` |
-| Tempo | `GET /ready` | `200` |
 
 ---
 

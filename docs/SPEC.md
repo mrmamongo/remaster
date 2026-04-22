@@ -575,31 +575,41 @@ group:{childId}@parent@group:{parentId}
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Victoria Stack                            │
-├─────────────┬────────────────┬─────────────────────────────┤
-│ Victoria    │ Loki            │ Tempo (Grafana)              │
-│ Metrics     │ Logs            │ Traces (OpenTelemetry)      │
-│ Prometheus  │ (via Vector)    │ Jaeger-compatible           │
-└─────────────┴────────────────┴─────────────────────────────┘
-                           │
-                    ┌──────▼──────┐
-                    │   Grafana   │
-                    │  Dashboards │
-                    └─────────────┘
+├─────────────┬─────────────────┬──────────────────────────────┤
+│ Victoria   │ Victoria        │ Victoria                   │
+│ Metrics    │ Logs            │ Traces                     │
+│ (PromQL)   │ (LogQL)         │ (OTLP)                    │
+└─────────────┴─────────────────┴──────────────────────────────┘
 ```
 
-### Metrics
+### Victoria Metrics (Metrics)
 
 - **System**: CPU, RAM, Disk, Network
 - **Application**: RPS, Latency (p50, p95, p99), Error rate
 - **LLM**: Tokens/sec, Cost/hour, Model usage distribution
 - **Users**: Active users, Sessions, API calls
 
-### Tracing
+### Victoria Logs (Logs)
+
+- Docker log collection
+- Structured JSON logging
+- LogQL queries
+- Retention: 30 days
+
+### Victoria Traces (Traces)
 
 - OpenTelemetry integration
 - LLM tracing with spans for prompts, completions, token usage
 - Agent execution traces with tool calls
 - Distributed tracing across NATS
+- Jaeger-compatible API
+
+### Admin Panel (Dashboards)
+
+Админ-панель построена на SvelteKit с дашбордами как в Grafana:
+- System Overview, LLM Metrics, Chat Analytics
+- Agent Execution, Knowledge Base, MCP Servers
+- Infrastructure, Logs, Traces, Audit Logs
 
 ---
 
